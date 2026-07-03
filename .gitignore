@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+.turbo/
+.vercel/
+coverage/
+
+# TypeScript / framework caches
+*.tsbuildinfo
+.eslintcache
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Runtime downloads / temporary files
+downloads/
+tmp/
+temp/
+*.tmp
+*.part
+*.ytdl
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# Local agent/tooling state
+.agents/
+.codex/
+.sixth/
+
+# Local documents and extracted Office files not needed for the app
+*.docx
+resume_xml/
+resume_extract/
+resume_verify/
+resume_source.zip
+VideoSave_System_Design.docx
