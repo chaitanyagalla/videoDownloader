@@ -13,6 +13,7 @@ coverage/
 # TypeScript / framework caches
 *.tsbuildinfo
 .eslintcache
+.npm-cache/
 
 # Environment files and secrets
 .env

@@ -167,22 +167,20 @@ export default function TerminalLogs({
   }, [logs]);
 
   return (
-    <div className={compact ? "" : "cyber-panel rounded-2xl p-4 sm:p-5"}>
+    <div className={compact ? "" : "ops-panel p-4 sm:p-5"}>
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-[var(--text-main)]">
-            {compact ? "Recent activity" : "Download activity"}
+          <p className="section-label">
+            Activity
           </p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {compact
-              ? "Helpful updates from the current download."
-              : "Helpful updates from the current download."}
+          <p className="mt-1 text-sm font-medium text-[var(--text-main)]">
+            Event rail
           </p>
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
-          <span className="h-2 w-2 rounded-full bg-[var(--text-subtle)]" />
-          <span className="font-mono-system text-[11px] uppercase tracking-[0.14em] text-[var(--text-neutral)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--mint)]" />
+          <span className="font-mono-system text-[11px] text-[var(--text-muted)]">
             {renderedLogs.length} updates
           </span>
         </div>
@@ -190,18 +188,18 @@ export default function TerminalLogs({
 
       <div
         ref={scrollContainerRef}
-        className={`overflow-y-auto rounded-xl border border-[var(--border-soft)] bg-[linear-gradient(180deg,rgba(255,255,255,0.022)_0%,rgba(0,0,0,0.3)_100%)] p-3 sm:p-4 ${
+        className={`surface overflow-y-auto p-3 sm:p-4 ${
           compact
-            ? "max-h-[220px] min-h-[170px] md:max-h-[240px] md:min-h-[190px] xl:max-h-[280px] xl:min-h-[220px]"
+            ? "max-h-[210px] min-h-[160px] md:max-h-[230px] md:min-h-[180px] xl:max-h-[280px] xl:min-h-[220px]"
             : "max-h-[260px] min-h-[210px] md:max-h-[290px] md:min-h-[230px] xl:max-h-[320px] xl:min-h-[260px]"
         }`}
       >
         <div className="mb-3 flex flex-col gap-2 border-b border-[var(--border-soft)] pb-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-mono-system text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+          <span className="font-mono-system text-[11px] text-[var(--text-dim)]">
             Current session
           </span>
-          <span className="font-mono-system text-[11px] uppercase tracking-[0.16em] text-[var(--text-neutral)]">
-            Auto-updating
+          <span className="font-mono-system text-[11px] text-[var(--text-muted)]">
+            Live
           </span>
         </div>
 
@@ -212,7 +210,7 @@ export default function TerminalLogs({
               {!logLine.isComplete ? (
                 <span
                   aria-hidden="true"
-                  className="terminal-cursor ml-1 inline-block h-[1.05em] w-[0.6ch] align-[-0.18em] bg-[var(--text-neutral)]"
+                  className="terminal-cursor ml-1 inline-block h-[1.05em] w-[0.6ch] align-[-0.18em] bg-[var(--text-soft)]"
                 />
               ) : null}
             </p>

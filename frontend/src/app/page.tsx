@@ -2,14 +2,16 @@
 
 import { useMemo, useRef } from "react";
 import Navbar from "@/components/core/Navbar";
-import { type HeistStatus } from "@/components/heist/StatusIndicator";
 import TerminalLogs from "@/components/heist/TerminalLogs";
-import { URLInput } from "@/components/URLInput";
+import { type OpsStatus } from "@/components/heist/StatusIndicator";
 import { DownloadList } from "@/components/DownloadList";
+import { PlatformBadge } from "@/components/PlatformBadge";
+import { ProgressBar } from "@/components/ProgressBar";
+import { URLInput } from "@/components/URLInput";
 import Panel from "@/components/ui/Panel";
 import { useAuth } from "@/hooks/useAuth";
-import { useDownload } from "@/hooks/useDownload";
 import { useDashboardMotion } from "@/hooks/useDashboardMotion";
+import { useDownload } from "@/hooks/useDownload";
 import type { DownloadRecord } from "@/types";
 
 function sortDownloadsByNewest(downloads: DownloadRecord[]): DownloadRecord[] {
@@ -20,32 +22,28 @@ function sortDownloadsByNewest(downloads: DownloadRecord[]): DownloadRecord[] {
   });
 }
 
-function getCurrentMissionStatus(params: {
+function getCurrentOpsStatus(params: {
   isSubmitting: boolean;
   error: string | null;
   activeDownload: DownloadRecord | null;
   latestDownload: DownloadRecord | null;
-}): HeistStatus {
+}): OpsStatus {
   const { isSubmitting, error, activeDownload, latestDownload } = params;
 
   if (isSubmitting) {
-    return "LOCKING TARGET";
+    return "CAPTURE";
   }
 
   if (activeDownload) {
-    return "DOWNLOADING";
+    return "PROCESSING";
   }
 
   if (latestDownload?.status === "completed") {
-    return "MISSION COMPLETED";
+    return "READY";
   }
 
-  if (latestDownload?.status === "failed") {
-    return "MISSION FAILED";
-  }
-
-  if (error) {
-    return "MISSION FAILED";
+  if (latestDownload?.status === "failed" || error) {
+    return "REVIEW";
   }
 
   return "IDLE";
@@ -64,11 +62,11 @@ function getLogStatusLabel(status: DownloadRecord["status"]): string {
     case "pending":
       return "Queued";
     case "downloading":
-      return "Downloading";
+      return "Processing";
     case "completed":
-      return "Completed";
+      return "Ready";
     case "failed":
-      return "Failed";
+      return "Review";
     default:
       return status;
   }
@@ -82,6 +80,161 @@ function truncateForLog(value: string, maxLength = 68): string {
   const headLength = Math.max(28, Math.floor(maxLength * 0.6));
   const tailLength = Math.max(12, maxLength - headLength - 3);
   return `${value.slice(0, headLength)}...${value.slice(-tailLength)}`;
+}
+
+function truncateSource(url: string, maxLength = 52): string {
+  try {
+    const parsedUrl = new URL(url);
+    const compact = `${parsedUrl.hostname}${parsedUrl.pathname}`;
+    return compact.length > maxLength
+      ? `${compact.slice(0, maxLength)}...`
+      : compact;
+  } catch {
+    return url.length > maxLength ? `${url.slice(0, maxLength)}...` : url;
+  }
+}
+
+function getFileName(filePath: string | null | undefined): string | null {
+  if (!filePath) {
+    return null;
+  }
+
+  return filePath.split(/[\\/]/).pop() ?? filePath;
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.5 6H18m0 0v4.5M18 6l-7.5 7.5M6 8.25V18h9.75" />
+    </svg>
+  );
+}
+
+function ProcessingPanel({
+  download,
+  error,
+  status,
+}: {
+  download: DownloadRecord | null;
+  error: string | null;
+  status: OpsStatus;
+}) {
+  const fileName = getFileName(download?.filePath);
+  const progress = download ? Math.max(0, Math.min(100, download.progress)) : 0;
+
+  const statusLabel =
+    status === "CAPTURE"
+      ? "Capturing"
+      : status === "PROCESSING"
+      ? "Processing"
+      : status === "READY"
+      ? "Ready"
+      : status === "REVIEW"
+      ? "Review"
+      : "Idle";
+
+  const statusClassName =
+    status === "REVIEW"
+      ? "text-[var(--danger)]"
+      : status === "CAPTURE"
+      ? "text-[var(--amber)]"
+      : status === "IDLE"
+      ? "text-[var(--text-muted)]"
+      : "text-[var(--mint-strong)]";
+
+  return (
+    <Panel
+      variant="support"
+      title="Processing"
+      subtitle="Live state from the current source."
+      className="h-full"
+    >
+      <div className="surface-strong min-h-[22rem] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className={`rounded-md border border-[var(--border)] px-2.5 py-1 font-mono-system text-xs ${statusClassName}`}>
+            {statusLabel}
+          </span>
+          <span className="font-mono-system text-xs text-[var(--text-dim)]">
+            {progress.toFixed(1)}%
+          </span>
+        </div>
+
+        {download ? (
+          <div className="mt-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <PlatformBadge platform={download.platform} />
+              <a
+                href={download.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={download.url}
+                className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border border-[var(--border-soft)] px-2.5 py-1 font-mono-system text-[11px] text-[var(--text-muted)] transition-colors hover:text-[var(--mint-strong)]"
+              >
+                <ExternalLinkIcon />
+                <span className="truncate">{truncateSource(download.url)}</span>
+              </a>
+            </div>
+
+            <h3 className="mt-4 line-clamp-2 break-words text-xl font-semibold leading-7 text-[var(--text-main)]">
+              {getDisplayLabel(download)}
+            </h3>
+
+            <div className="mt-5">
+              <ProgressBar progress={download.progress} status={download.status} />
+            </div>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+              <div className="surface p-3">
+                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
+                  Stage
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--text-soft)]">
+                  {getLogStatusLabel(download.status)}
+                </p>
+              </div>
+              <div className="surface p-3">
+                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
+                  Timing
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--text-soft)]">
+                  {download.eta ? `ETA ${download.eta}` : download.speed ?? "Stable"}
+                </p>
+              </div>
+              <div className="surface p-3">
+                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
+                  Output
+                </p>
+                <p className="mt-1 line-clamp-2 break-words text-sm font-medium text-[var(--text-soft)]">
+                  {fileName ?? "Pending"}
+                </p>
+              </div>
+            </div>
+
+            {download.status === "failed" && download.errorMsg ? (
+              <p className="mt-4 rounded-lg border border-[rgba(255,107,127,0.3)] bg-[rgba(255,107,127,0.08)] p-3 text-sm leading-6 text-[var(--danger)]">
+                {download.errorMsg}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-8">
+            <h3 className="text-2xl font-semibold leading-8 text-[var(--text-main)]">
+              Ready for a source.
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
+              The next captured link will appear here with transfer progress,
+              file output, and source access.
+            </p>
+            {error ? (
+              <p className="mt-4 rounded-lg border border-[rgba(255,107,127,0.3)] bg-[rgba(255,107,127,0.08)] p-3 text-sm leading-6 text-[var(--danger)]">
+                {error}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
 }
 
 export default function HomePage() {
@@ -119,7 +272,7 @@ export default function HomePage() {
   const latestDownload = sortedDownloads[0] ?? null;
   const focusedDownload = activeDownload ?? latestDownload;
 
-  const currentStatus = getCurrentMissionStatus({
+  const currentStatus = getCurrentOpsStatus({
     isSubmitting,
     error,
     activeDownload,
@@ -132,48 +285,37 @@ export default function HomePage() {
   });
 
   const terminalLogs = useMemo(() => {
-    const logs: string[] = [
-      "System ready.",
-      "Waiting for a video link.",
-    ];
+    const logs: string[] = ["VideoSave ready."];
 
     if (auth.error) {
       logs.push(`Account: ${auth.error}`);
     } else {
-      logs.push(
-        isHistoryEnabled
-          ? "History sync enabled."
-          : "Guest mode: history off."
-      );
+      logs.push(isHistoryEnabled ? "Archive sync enabled." : "Guest workspace.");
     }
 
     switch (currentStatus) {
-      case "IDLE":
+      case "CAPTURE":
+        logs.push("Source received.");
+        logs.push("Validating link.");
         break;
 
-      case "LOCKING TARGET":
-        logs.push("Link received.");
-        logs.push("Checking the source...");
-        logs.push("Preparing the download...");
-        break;
-
-      case "DOWNLOADING":
+      case "PROCESSING":
         logs.push("Source confirmed.");
-        logs.push("Downloading video data...");
-        logs.push("Saving the file locally...");
+        logs.push("Transfer in progress.");
         break;
 
-      case "MISSION COMPLETED":
-        logs.push("Download finished successfully.");
-        logs.push("The file is ready on your device.");
+      case "READY":
+        logs.push("File saved.");
+        logs.push("Archive updated.");
         break;
 
-      case "MISSION FAILED":
-        logs.push("The download could not be completed.");
-        logs.push(error ?? "Something went wrong during extraction.");
+      case "REVIEW":
+        logs.push("Download needs review.");
+        logs.push(error ?? "Check the item details.");
         break;
 
       default:
+        logs.push("Waiting for source.");
         break;
     }
 
@@ -181,7 +323,7 @@ export default function HomePage() {
       const label = getDisplayLabel(focusedDownload);
 
       if (label) {
-        logs.push(`Current item: ${truncateForLog(label)}`);
+        logs.push(`Item: ${truncateForLog(label)}`);
       }
 
       logs.push(`Platform: ${focusedDownload.platform}`);
@@ -206,22 +348,20 @@ export default function HomePage() {
       }
 
       if (focusedDownload.status === "completed" && focusedDownload.filePath) {
-        logs.push(`Saved to: ${truncateForLog(focusedDownload.filePath)}`);
+        logs.push(`Saved: ${truncateForLog(focusedDownload.filePath)}`);
       }
 
       if (focusedDownload.status === "failed" && focusedDownload.errorMsg) {
-        logs.push(`Error details: ${truncateForLog(focusedDownload.errorMsg)}`);
+        logs.push(`Error: ${truncateForLog(focusedDownload.errorMsg)}`);
       }
     }
 
     if (sortedDownloads.length > 0) {
-      logs.push("Recent downloads:");
+      logs.push("Recent archive:");
 
       sortedDownloads.slice(0, 3).forEach((download) => {
         const label = getDisplayLabel(download) ?? download.url;
-        logs.push(
-          `${getLogStatusLabel(download.status)}: ${truncateForLog(label)}`
-        );
+        logs.push(`${getLogStatusLabel(download.status)}: ${truncateForLog(label)}`);
       });
     }
 
@@ -250,82 +390,36 @@ export default function HomePage() {
         ref={rootRef}
         className="relative z-10 mx-auto w-full max-w-[1440px] px-3 py-4 pb-10 sm:px-5 sm:py-5 sm:pb-12 md:px-6 lg:px-8"
       >
-        <section className="mb-6">
-          <Panel
-            variant="feature"
-            className="sm:p-6 lg:p-8"
-            title="Download Console"
-          >
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(18rem,0.88fr)] xl:items-start xl:gap-6 2xl:grid-cols-[minmax(520px,1.16fr)_minmax(0,0.84fr)]">
-              <div data-motion="hero" data-mission-reactive="true">
-                <div className="rounded-[1.55rem] border border-[rgba(176,200,188,0.18)] bg-[linear-gradient(180deg,rgba(255,255,255,0.045)_0%,rgba(255,255,255,0.02)_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-4">
-                  <URLInput onSubmit={addDownload} isSubmitting={isSubmitting} />
-                </div>
-              </div>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.72fr)]">
+          <div data-motion="hero" data-ops-reactive="true">
+            <Panel
+              variant="feature"
+              title="Workbench"
+              subtitle="Capture a source, track the transfer, and keep the archive close."
+              className="h-full sm:p-6 lg:p-7"
+            >
+              <URLInput onSubmit={addDownload} isSubmitting={isSubmitting} />
+            </Panel>
+          </div>
 
-              <div className="max-w-full xl:max-w-[30rem] xl:pt-2 2xl:max-w-[28rem]">
-                <p data-motion="hero" className="section-label">
-                  Start Here
-                </p>
-                <h2
-                  data-motion="hero"
-                  data-hero-title="true"
-                  className="mt-3 max-w-[12ch] text-[clamp(1.55rem,1.18rem+0.95vw,2.25rem)] font-semibold leading-[1.04] tracking-[-0.03em] text-[var(--text-neutral)]"
-                >
-                  Paste a video URL and save it locally.
-                </h2>
-                <p
-                  data-motion="hero"
-                  className="body-text mt-4 max-w-[42ch] text-[var(--text-neutral)]"
-                >
-                  Use a YouTube, Instagram, or X link. The app detects the
-                  source, downloads the file, and shows progress below.
-                </p>
-
-                <div data-motion="hero" className="mt-5 grid gap-2.5 sm:mt-6 sm:gap-3">
-                  {[
-                    {
-                      label: "Supported links",
-                      value: "Works with YouTube, Instagram, and X video URLs.",
-                    },
-                    {
-                      label: isHistoryEnabled ? "History enabled" : "Guest mode",
-                      value: isHistoryEnabled
-                        ? "Completed links are saved to your account history."
-                        : "Downloads work without an account; history is not saved.",
-                    },
-                    {
-                      label: "Saved automatically",
-                      value: "Finished files appear in your Downloads folder.",
-                    },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-2xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.022)] px-4 py-3"
-                    >
-                      <p className="text-sm font-medium text-[var(--text-main)]">
-                        {item.label}
-                      </p>
-                      <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">
-                        {item.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Panel>
+          <div data-motion="left-panel" data-ops-reactive="true">
+            <ProcessingPanel
+              download={focusedDownload}
+              error={error}
+              status={currentStatus}
+            />
+          </div>
         </section>
 
-        <section className="mt-5 grid gap-5 sm:mt-6 sm:gap-6 xl:grid-cols-[minmax(0,1.58fr)_minmax(18rem,0.8fr)] 2xl:grid-cols-[minmax(0,1.72fr)_300px]">
-          <div data-motion="archive" data-mission-reactive="true">
+        <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div data-motion="archive" data-ops-reactive="true">
             <Panel
               variant="archive"
-              title={isHistoryEnabled ? "Download History" : "Downloads"}
+              title={isHistoryEnabled ? "Archive" : "Guest Archive"}
               subtitle={
                 isHistoryEnabled
-                  ? "Your signed-in links and active downloads are listed here."
-                  : "Guest downloads stay on this screen only and are not saved."
+                  ? "Saved sources, local outputs, and source links."
+                  : "Temporary downloads for this browser session."
               }
             >
               <DownloadList
@@ -337,11 +431,11 @@ export default function HomePage() {
             </Panel>
           </div>
 
-          <aside data-motion="terminal" data-mission-reactive="true">
+          <aside data-motion="terminal" data-ops-reactive="true">
             <Panel
               variant="support"
-              title="Activity Log"
-              subtitle="Live details from the current download."
+              title="Activity"
+              subtitle="Compact event stream."
               className="h-full"
             >
               <TerminalLogs logs={terminalLogs} compact />

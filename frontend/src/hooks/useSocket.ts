@@ -39,6 +39,7 @@ function getSocket(): AppSocket {
       process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000",
       {
         transports: ["websocket", "polling"],
+        withCredentials: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
       }

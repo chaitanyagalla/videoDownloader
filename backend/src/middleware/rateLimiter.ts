@@ -23,7 +23,7 @@ export const apiRateLimiter = rateLimit({
 // Stricter limiter specifically for starting new downloads
 export const downloadRateLimiter = rateLimit({
   windowMs: 60_000, // 1 minute
-  max: 10,
+  max: env.DOWNLOAD_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => {

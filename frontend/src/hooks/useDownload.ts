@@ -40,7 +40,6 @@ export function useDownload({
     let cancelled = false;
 
     if (!enabled) {
-      setIsLoading(true);
       return () => {
         cancelled = true;
       };

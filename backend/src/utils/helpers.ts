@@ -1,30 +1,84 @@
 // src/utils/helpers.ts
-import os from "os";
 import path from "path";
+import { env } from "../config/env";
 import { Platform } from "../types";
 
 // ─── Platform Detection ────────────────────────────────────────────────────
 
-const PLATFORM_PATTERNS: Record<Platform, RegExp[]> = {
-  youtube: [
-    /^https?:\/\/(www\.)?(youtube\.com\/(watch\?.*v=|shorts\/|live\/)|youtu\.be\/)/,
-  ],
-  twitter: [
-    /^https?:\/\/(www\.)?(twitter\.com|x\.com)\/.+\/status\//,
-  ],
-  instagram: [
-    /^https?:\/\/(www\.)?instagram\.com\/(p|reel|tv)\//,
-  ],
-  unknown: [],
-};
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "youtu.be",
+]);
+
+const TWITTER_HOSTS = new Set([
+  "twitter.com",
+  "www.twitter.com",
+  "x.com",
+  "www.x.com",
+]);
+
+const INSTAGRAM_HOSTS = new Set([
+  "instagram.com",
+  "www.instagram.com",
+]);
+
+function parseSupportedHttpUrl(raw: string): URL | null {
+  try {
+    const parsed = new URL(raw.trim());
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return null;
+    }
+
+    if (parsed.username || parsed.password) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 export function detectPlatform(url: string): Platform {
-  for (const [platform, patterns] of Object.entries(PLATFORM_PATTERNS)) {
-    if (platform === "unknown") continue;
-    if (patterns.some((pattern) => pattern.test(url))) {
-      return platform as Platform;
+  const parsed = parseSupportedHttpUrl(url);
+  if (!parsed) {
+    return "unknown";
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const segments = parsed.pathname.split("/").filter(Boolean);
+
+  if (YOUTUBE_HOSTS.has(host)) {
+    if (host === "youtu.be") {
+      return segments[0] ? "youtube" : "unknown";
+    }
+
+    if (
+      (segments[0] === "watch" && parsed.searchParams.has("v")) ||
+      (["shorts", "live"].includes(segments[0] ?? "") && Boolean(segments[1]))
+    ) {
+      return "youtube";
     }
   }
+
+  if (TWITTER_HOSTS.has(host)) {
+    if (
+      segments.length >= 3 &&
+      segments[1] === "status" &&
+      /^\d+$/.test(segments[2] ?? "")
+    ) {
+      return "twitter";
+    }
+  }
+
+  if (INSTAGRAM_HOSTS.has(host)) {
+    if (["p", "reel", "tv"].includes(segments[0] ?? "") && Boolean(segments[1])) {
+      return "instagram";
+    }
+  }
+
   return "unknown";
 }
 
@@ -33,12 +87,7 @@ export function isSupportedUrl(url: string): boolean {
 }
 
 export function isValidUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return ["http:", "https:"].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
+  return parseSupportedHttpUrl(url) !== null;
 }
 
 // ─── File System Helpers ───────────────────────────────────────────────────
@@ -49,7 +98,9 @@ export function isValidUrl(url: string): boolean {
  * macOS/Linux: ~/Downloads
  */
 export function getDownloadsFolder(): string {
-  return path.join(os.homedir(), "Downloads");
+  return env.DOWNLOADS_DIR
+    ? path.resolve(env.DOWNLOADS_DIR)
+    : path.join(process.cwd(), "downloads");
 }
 
 /**

@@ -22,101 +22,41 @@ type DragState = "idle" | "hovering" | "invalid";
 
 function LinkIcon() {
   return (
-    <svg
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
-        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.415-1.414m-.758-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656L12.07 4.343"
-      />
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.415-1.414m-.758-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656L12.07 4.343" />
     </svg>
   );
 }
 
 function ClearIcon() {
   return (
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
-        d="M6 18 18 6M6 6l12 12"
-      />
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
 }
 
 function ArrowUpIcon() {
   return (
-    <svg
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
-        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-7-4-4m0 0-4 4m4-4v12"
-      />
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-7-4-4m0 0-4 4m4-4v12" />
     </svg>
   );
 }
 
 function AlertIcon() {
   return (
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.8}
-        d="M12 9v3m0 4h.01m-7.938 4h15.876c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L2.33 17c-.77 1.333.192 3 1.732 3Z"
-      />
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 9v3m0 4h.01m-7.938 4h15.876c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L2.33 17c-.77 1.333.192 3 1.732 3Z" />
     </svg>
   );
 }
 
 function SpinnerIcon() {
   return (
-    <svg
-      className="h-4 w-4 animate-spin"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-80"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4Z"
-      />
+    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4Z" />
     </svg>
   );
 }
@@ -178,7 +118,7 @@ export function URLInput({
         await onSubmit(trimmed);
         resetInput();
       } catch {
-        // parent hook handles global error state
+        // parent hook owns the visible error state
       }
     },
     [onSubmit, resetInput]
@@ -197,9 +137,7 @@ export function URLInput({
     event.stopPropagation();
     dragCounter.current += 1;
 
-    const items = Array.from(event.dataTransfer.items);
-
-    const hasText = items.some(
+    const hasText = Array.from(event.dataTransfer.items).some(
       (item) =>
         item.kind === "string" &&
         (item.type === "text/uri-list" || item.type === "text/plain")
@@ -211,7 +149,6 @@ export function URLInput({
   const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-
     dragCounter.current -= 1;
 
     if (dragCounter.current <= 0) {
@@ -229,7 +166,6 @@ export function URLInput({
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       event.stopPropagation();
-
       dragCounter.current = 0;
       setDragState("idle");
 
@@ -252,41 +188,19 @@ export function URLInput({
 
   const frameClassName = useMemo(() => {
     if (dragState === "hovering") {
-      return "border-[rgba(0,255,159,0.42)]";
+      return "border-[rgba(101,230,173,0.54)]";
     }
 
     if (dragState === "invalid" || validationError) {
-      return "border-[rgba(255,77,109,0.45)]";
+      return "border-[rgba(255,107,127,0.58)]";
     }
 
     if (value && !validationError) {
-      return "border-[rgba(122,255,193,0.34)]";
+      return "border-[rgba(101,230,173,0.42)]";
     }
 
     return "border-[var(--border)]";
   }, [dragState, validationError, value]);
-
-  const overlayContent = useMemo(() => {
-    if (dragState === "hovering") {
-      return {
-        text: "DROP LINK TO START DOWNLOAD",
-        className:
-          "border-[rgba(0,255,159,0.45)] bg-[rgba(0,255,159,0.08)] text-[var(--neon)]",
-        icon: <ArrowUpIcon />,
-      };
-    }
-
-    if (dragState === "invalid") {
-      return {
-        text: "ONLY VALID VIDEO LINKS ARE ACCEPTED",
-        className:
-          "border-[rgba(255,77,109,0.45)] bg-[rgba(255,77,109,0.08)] text-[var(--danger)]",
-        icon: <AlertIcon />,
-      };
-    }
-
-    return null;
-  }, [dragState]);
 
   const helperText = useMemo(() => {
     if (validationError) {
@@ -294,33 +208,52 @@ export function URLInput({
     }
 
     if (detectedPlatform) {
-      return "Link recognized. Ready to start the download.";
+      return "Source recognized.";
     }
 
-    return "Paste a link or drag one anywhere into this card to begin.";
+    return "Paste or drop a supported URL.";
   }, [detectedPlatform, validationError]);
+
+  const overlayContent = useMemo(() => {
+    if (dragState === "hovering") {
+      return {
+        text: "Drop to capture",
+        className: "border-[rgba(101,230,173,0.54)] bg-[rgba(101,230,173,0.11)] text-[var(--mint-strong)]",
+        icon: <ArrowUpIcon />,
+      };
+    }
+
+    if (dragState === "invalid") {
+      return {
+        text: "Use a video link",
+        className: "border-[rgba(255,107,127,0.54)] bg-[rgba(255,107,127,0.1)] text-[var(--danger)]",
+        icon: <AlertIcon />,
+      };
+    }
+
+    return null;
+  }, [dragState]);
 
   return (
     <form onSubmit={handleFormSubmit} className="w-full" noValidate>
-      <div className="mb-5 flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 font-mono-system text-[10px] uppercase tracking-[0.14em] text-[var(--text-neutral)]">
-              Step 01
-            </span>
-            <p className="section-label">Paste Video URL</p>
-          </div>
-          <p className="mt-3 max-w-[34ch] text-sm leading-6 text-[var(--text-muted)]">
-            Enter one supported link to start the download flow. Detection and
-            save handling happen automatically.
-          </p>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="section-label">Capture</p>
+          <h2 className="mt-2 text-2xl font-semibold leading-8 text-[var(--text-main)]">
+            Source dock
+          </h2>
         </div>
 
-        <div className="hidden shrink-0 items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 sm:flex">
-          <span className="h-2 w-2 rounded-full bg-[var(--neon-soft)]" />
-          <span className="font-mono-system text-[11px] uppercase tracking-[0.14em] text-[var(--text-neutral)]">
-            Ready
-          </span>
+        <div className="flex flex-wrap gap-2">
+          {detectedPlatform ? (
+            <PlatformBadge platform={detectedPlatform} />
+          ) : (
+            ["YouTube", "Instagram", "X"].map((label) => (
+              <span key={label} className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 font-mono-system text-[11px] text-[var(--text-muted)]">
+                {label}
+              </span>
+            ))
+          )}
         </div>
       </div>
 
@@ -332,67 +265,25 @@ export function URLInput({
         className="relative"
       >
         {overlayContent ? (
-          <div
-            className={`absolute inset-0 z-10 flex items-center justify-center rounded-2xl border backdrop-blur-md ${overlayContent.className}`}
-          >
-            <span className="flex items-center gap-3 px-4 text-center font-mono-system text-xs font-bold uppercase tracking-[0.22em] sm:text-sm">
+          <div className={`absolute inset-0 z-10 flex items-center justify-center rounded-xl border backdrop-blur-md ${overlayContent.className}`}>
+            <span className="flex items-center gap-3 px-4 text-center font-mono-system text-sm font-bold">
               {overlayContent.icon}
               {overlayContent.text}
             </span>
           </div>
         ) : null}
 
-        <div
-          aria-label="Video URL input area"
-          className={`rounded-[1.35rem] border bg-[linear-gradient(180deg,rgba(255,255,255,0.028)_0%,rgba(0,0,0,0.18)_100%)] p-4 transition-all duration-200 sm:p-5 ${frameClassName}`}
-        >
-          <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="min-w-0 flex-1">
-              <span className="font-mono-system text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
-                Link Input
-              </span>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-                Paste, drag, or drop a supported URL.
-              </p>
-              <span className="mt-2 inline-flex rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 font-mono-system text-[10px] uppercase tracking-[0.12em] text-[var(--text-neutral)]">
-                Drag & drop supported
-              </span>
-            </div>
-
-            {detectedPlatform ? (
-              <PlatformBadge
-                platform={detectedPlatform}
-                className="shrink-0 self-start sm:self-center"
-              />
-            ) : (
-              <span className="font-mono-system text-[10px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
-                Awaiting link
-              </span>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.02)] p-4">
-            <div className="flex items-start gap-3">
-              <div
-                className={`mt-0.5 shrink-0 ${
-                  validationError
-                    ? "text-[var(--danger)]"
-                    : value
-                    ? "text-[var(--neon)]"
-                    : "text-[var(--text-dim)]"
-                }`}
-              >
+        <div aria-label="Video URL input area" className={`surface-strong p-3 transition-all duration-200 sm:p-4 ${frameClassName}`}>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex min-w-0 flex-1 items-start gap-3 rounded-xl border border-[var(--border-soft)] bg-[rgba(0,0,0,0.16)] p-3 sm:items-center">
+              <div className={validationError ? "mt-0.5 text-[var(--danger)] sm:mt-0" : value ? "mt-0.5 text-[var(--mint)] sm:mt-0" : "mt-0.5 text-[var(--text-dim)] sm:mt-0"}>
                 <LinkIcon />
               </div>
 
               <div className="min-w-0 flex-1">
-                <label
-                  htmlFor="target-url"
-                  className="text-sm font-medium text-[var(--text-neutral)]"
-                >
+                <label htmlFor="target-url" className="text-sm font-medium text-[var(--text-soft)]">
                   Video URL
                 </label>
-
                 <input
                   id="target-url"
                   ref={inputRef}
@@ -408,7 +299,7 @@ export function URLInput({
                   spellCheck={false}
                   aria-invalid={Boolean(validationError)}
                   aria-describedby="target-url-helper"
-                  className="mt-2 block w-full bg-transparent font-sans-system text-[15px] leading-7 text-[var(--text-main)] outline-none placeholder:text-[rgba(184,203,194,0.34)] disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
+                  className="mt-1 block w-full bg-transparent text-base leading-7 text-[var(--text-main)] outline-none placeholder:text-[rgba(201,216,208,0.42)] disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
 
@@ -419,65 +310,52 @@ export function URLInput({
                     resetInput();
                     inputRef.current?.focus();
                   }}
-                  className="shrink-0 rounded-lg border border-transparent p-2 text-[var(--text-dim)] transition-colors hover:border-[rgba(0,255,159,0.14)] hover:text-[var(--text-main)]"
+                  className="shrink-0 rounded-lg border border-transparent p-2 text-[var(--text-dim)] transition-colors hover:border-[var(--border)] hover:text-[var(--text-main)]"
                   aria-label="Clear target URL"
                 >
                   <ClearIcon />
                 </button>
               ) : null}
             </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {["YouTube", "Instagram", "X"].map((label) => (
-              <span
-                key={label}
-                className="rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-center font-mono-system text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)] last:col-span-2 sm:last:col-span-1"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-5 flex flex-col gap-4 border-t border-[var(--border-soft)] pt-4 lg:flex-row lg:items-center lg:justify-between">
-            <p
-              id="target-url-helper"
-              className={`flex max-w-full items-start gap-2 text-sm leading-6 lg:max-w-[38ch] ${
-                validationError
-                  ? "text-[var(--danger)]"
-                  : detectedPlatform
-                  ? "text-[var(--neon-soft)]"
-                  : "text-[var(--text-muted)]"
-              }`}
-              aria-live="polite"
-            >
-              {validationError ? (
-                <span className="mt-1 shrink-0">
-                  <AlertIcon />
-                </span>
-              ) : null}
-              <span>{helperText}</span>
-            </p>
 
             <button
               type="submit"
               disabled={!canSubmit}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[rgba(98,227,170,0.42)] bg-[linear-gradient(180deg,#62e3aa_0%,#2fcf8f_100%)] px-5 py-3 font-mono-system text-xs font-bold uppercase tracking-[0.18em] text-[#04140d] shadow-[0_12px_28px_rgba(47,207,143,0.18)] transition-all duration-200 hover:translate-y-[-1px] hover:border-[rgba(122,255,193,0.5)] hover:bg-[linear-gradient(180deg,#78ebb9_0%,#39d596_100%)] disabled:cursor-not-allowed disabled:border-[rgba(145,167,156,0.16)] disabled:bg-[rgba(255,255,255,0.045)] disabled:text-[rgba(214,228,220,0.76)] disabled:shadow-none disabled:hover:translate-y-0 sm:min-w-[11rem] lg:w-auto"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[rgba(101,230,173,0.5)] bg-[var(--mint)] px-5 py-3 font-semibold text-[var(--text-inverse)] transition-all duration-200 hover:translate-y-[-1px] hover:bg-[var(--mint-strong)] disabled:cursor-not-allowed disabled:border-[var(--border-soft)] disabled:bg-[rgba(255,255,255,0.06)] disabled:text-[var(--text-muted)] disabled:hover:translate-y-0 lg:w-auto lg:min-w-[11.5rem]"
               aria-busy={isSubmitting}
             >
               {isSubmitting ? (
                 <>
                   <SpinnerIcon />
-                  Starting Download
+                  Processing
                 </>
               ) : (
                 <>
                   <ArrowUpIcon />
-                  Start Download
+                  Capture
                 </>
               )}
             </button>
           </div>
+
+          <p
+            id="target-url-helper"
+            className={`mt-3 flex max-w-full items-start gap-2 text-sm leading-6 ${
+              validationError
+                ? "text-[var(--danger)]"
+                : detectedPlatform
+                ? "text-[var(--mint-strong)]"
+                : "text-[var(--text-muted)]"
+            }`}
+            aria-live="polite"
+          >
+            {validationError ? (
+              <span className="mt-1 shrink-0">
+                <AlertIcon />
+              </span>
+            ) : null}
+            <span>{helperText}</span>
+          </p>
         </div>
       </div>
     </form>

@@ -12,25 +12,15 @@ interface DownloadListProps {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.02)] p-4">
+    <div className="surface p-4">
       <div className="animate-pulse">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="h-3 w-28 rounded bg-[rgba(255,255,255,0.08)]" />
-            <div className="mt-4 h-4 w-4/5 rounded bg-[rgba(255,255,255,0.08)]" />
-            <div className="mt-3 flex gap-2">
-              <div className="h-6 w-20 rounded-full bg-[rgba(255,255,255,0.08)]" />
-              <div className="h-4 w-28 rounded bg-[rgba(255,255,255,0.08)]" />
-            </div>
+            <div className="h-5 w-40 rounded bg-[rgba(255,255,255,0.08)]" />
+            <div className="mt-3 h-4 w-4/5 rounded bg-[rgba(255,255,255,0.07)]" />
+            <div className="mt-4 h-16 rounded-lg bg-[rgba(255,255,255,0.05)]" />
           </div>
-
-          <div className="h-8 w-8 rounded-xl bg-[rgba(255,255,255,0.08)]" />
-        </div>
-
-        <div className="mt-4 rounded-xl border border-[var(--border-soft)] p-3">
-          <div className="h-3 w-16 rounded bg-[rgba(255,255,255,0.08)]" />
-          <div className="mt-3 h-3 w-full rounded bg-[rgba(255,255,255,0.06)]" />
-          <div className="mt-4 h-3 w-1/2 rounded bg-[rgba(255,255,255,0.08)]" />
+          <div className="h-8 w-8 rounded-lg bg-[rgba(255,255,255,0.08)]" />
         </div>
       </div>
     </div>
@@ -39,38 +29,20 @@ function SkeletonCard() {
 
 function EmptyState({ isHistoryEnabled }: { isHistoryEnabled: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-soft)] bg-[rgba(255,255,255,0.02)] px-6 py-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] text-[var(--text-neutral)]">
-        <svg
-          className="h-7 w-7"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.6}
-            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5-4 4m0 0-4-4m4 4V4"
-          />
+    <div className="surface flex flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.04)] text-[var(--text-muted)]">
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5-4 4m0 0-4-4m4 4V4" />
         </svg>
       </div>
 
-      <p className="mt-4 text-sm font-medium text-[var(--text-neutral)]">
-        {isHistoryEnabled ? "No Downloads Yet" : "No Guest Downloads"}
-      </p>
-
-      <h3 className="mt-2 text-base font-medium text-[var(--text-main)]">
-        {isHistoryEnabled
-          ? "Nothing has been downloaded yet"
-          : "History is off in guest mode"}
+      <h3 className="mt-4 text-base font-semibold text-[var(--text-main)]">
+        {isHistoryEnabled ? "Archive is empty" : "Guest workspace is empty"}
       </h3>
-
       <p className="mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
         {isHistoryEnabled
-          ? "Paste a supported video URL above to start a download. Active and completed items will appear here."
-          : "Paste a video URL to download without saving a history record. Sign in before downloading when you want links saved."}
+          ? "Captured downloads will appear here with source links and saved files."
+          : "Guest downloads stay here only until the page is refreshed."}
       </p>
     </div>
   );
@@ -84,7 +56,7 @@ export function DownloadList({
 }: DownloadListProps) {
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {Array.from({ length: 2 }, (_, index) => (
           <SkeletonCard key={index} />
         ))}
@@ -98,24 +70,20 @@ export function DownloadList({
 
   return (
     <section aria-label="Downloads">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-[var(--text-main)]">
-            Recent downloads
-          </p>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
-            {isHistoryEnabled
-              ? "Active, completed, and failed downloads are listed below."
-              : "These guest downloads are temporary and are not saved to your account."}
-          </p>
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="section-label">Archive</p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--text-main)]">
+            Saved sources
+          </h2>
         </div>
 
-        <span className="self-start font-mono-system text-[10px] uppercase tracking-[0.12em] text-[var(--text-dim)] sm:self-auto">
-          {downloads.length} {downloads.length === 1 ? "Record" : "Records"}
+        <span className="self-start rounded-md border border-[var(--border-soft)] px-2.5 py-1 font-mono-system text-[11px] text-[var(--text-muted)] sm:self-auto">
+          {downloads.length} {downloads.length === 1 ? "record" : "records"}
         </span>
       </div>
 
-      <div className="grid gap-3 pb-2 2xl:grid-cols-2">
+      <div className="grid gap-3">
         {downloads.map((download) => (
           <DownloadCard
             key={download.id}

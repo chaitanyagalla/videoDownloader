@@ -27,14 +27,64 @@ const envSchema = z.object({
       message: "AUTH_SESSION_DAYS must be a positive number",
     }),
   YTDLP_PATH: z.string().default("yt-dlp"),
+  FFMPEG_LOCATION: z.string().optional(),
+  DOWNLOADS_DIR: z.string().optional(),
+  MAX_CONCURRENT_DOWNLOADS: z
+    .string()
+    .default("2")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0 && val <= 10, {
+      message: "MAX_CONCURRENT_DOWNLOADS must be between 1 and 10",
+    }),
+  MAX_DOWNLOAD_FILESIZE_MB: z
+    .string()
+    .default("500")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "MAX_DOWNLOAD_FILESIZE_MB must be a positive number",
+    }),
+  MAX_VIDEO_DURATION_SECONDS: z
+    .string()
+    .default("3600")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "MAX_VIDEO_DURATION_SECONDS must be a positive number",
+    }),
+  DOWNLOAD_TIMEOUT_MS: z
+    .string()
+    .default("900000")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val >= 30000, {
+      message: "DOWNLOAD_TIMEOUT_MS must be at least 30000",
+    }),
   RATE_LIMIT_WINDOW_MS: z
     .string()
     .default("60000")
-    .transform((val) => parseInt(val, 10)),
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "RATE_LIMIT_WINDOW_MS must be a positive number",
+    }),
   RATE_LIMIT_MAX: z
     .string()
     .default("20")
-    .transform((val) => parseInt(val, 10)),
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "RATE_LIMIT_MAX must be a positive number",
+    }),
+  DOWNLOAD_RATE_LIMIT_MAX: z
+    .string()
+    .default("5")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "DOWNLOAD_RATE_LIMIT_MAX must be a positive number",
+    }),
+  TRUST_PROXY_HOPS: z
+    .string()
+    .default("0")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val >= 0 && val <= 3, {
+      message: "TRUST_PROXY_HOPS must be between 0 and 3",
+    }),
 });
 
 const parsed = envSchema.safeParse(process.env);

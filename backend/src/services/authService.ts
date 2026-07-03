@@ -26,6 +26,7 @@ const googleProfileSchema = z.object({
 type GoogleProfile = z.infer<typeof googleProfileSchema>;
 
 export const oauthStateCookieName = `${env.AUTH_COOKIE_NAME}_oauth_state`;
+export const anonymousClientCookieName = `${env.AUTH_COOKIE_NAME}_anon`;
 
 function isSecureCookie(): boolean {
   return env.NODE_ENV === "production";
@@ -254,6 +255,20 @@ export function buildSessionCookie(token: string): string {
 
 export function clearSessionCookie(): string {
   return clearCookie(env.AUTH_COOKIE_NAME);
+}
+
+export function createAnonymousClientToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function buildAnonymousClientCookie(token: string): string {
+  return serializeCookie(anonymousClientCookieName, token, {
+    httpOnly: true,
+    secure: isSecureCookie(),
+    sameSite: "Lax",
+    maxAge: 7 * 24 * 60 * 60,
+    path: "/",
+  });
 }
 
 export async function createSession(userId: string): Promise<string> {

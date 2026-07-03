@@ -1,17 +1,17 @@
-type HeistStatus =
+type OpsStatus =
   | "IDLE"
-  | "LOCKING TARGET"
-  | "DOWNLOADING"
-  | "MISSION COMPLETED"
-  | "MISSION FAILED";
+  | "CAPTURE"
+  | "PROCESSING"
+  | "READY"
+  | "REVIEW";
 
 type StatusIndicatorProps = {
-  status: HeistStatus;
+  status: OpsStatus;
   error?: string | null;
 };
 
 const STATUS_STYLES: Record<
-  HeistStatus,
+  OpsStatus,
   {
     dotClassName: string;
     textClassName: string;
@@ -21,35 +21,32 @@ const STATUS_STYLES: Record<
   IDLE: {
     dotClassName: "bg-[var(--text-dim)] shadow-none",
     textClassName: "text-[var(--text-dim)]",
-    description: "Awaiting target URL input.",
+    description: "Ready for a source link.",
   },
-  "LOCKING TARGET": {
-    dotClassName:
-      "bg-[var(--warning)] shadow-[0_0_14px_rgba(255,204,0,0.65)]",
-    textClassName: "text-[var(--warning)]",
-    description: "Validating target and opening extraction channel.",
+  CAPTURE: {
+    dotClassName: "bg-[var(--amber)]",
+    textClassName: "text-[var(--amber)]",
+    description: "Checking the submitted source.",
   },
-  DOWNLOADING: {
-    dotClassName:
-      "bg-[var(--neon)] shadow-[0_0_14px_rgba(0,255,159,0.8)]",
-    textClassName: "text-[var(--neon)]",
-    description: "Packets are being extracted in real time.",
+  PROCESSING: {
+    dotClassName: "bg-[var(--mint)]",
+    textClassName: "text-[var(--mint)]",
+    description: "Saving the media locally.",
   },
-  "MISSION COMPLETED": {
-    dotClassName:
-      "bg-[var(--neon-soft)] shadow-[0_0_14px_rgba(122,255,193,0.8)]",
-    textClassName: "text-[var(--neon-soft)]",
-    description: "Target payload secured successfully.",
+  READY: {
+    dotClassName: "bg-[var(--mint-strong)]",
+    textClassName: "text-[var(--mint-strong)]",
+    description: "The file is ready in the archive.",
   },
-  "MISSION FAILED": {
-    dotClassName:
-      "bg-[var(--danger)] shadow-[0_0_14px_rgba(255,77,109,0.7)]",
+  REVIEW: {
+    dotClassName: "bg-[var(--danger)]",
     textClassName: "text-[var(--danger)]",
-    description: "The extraction failed. Review system output.",
+    description: "The last item needs attention.",
   },
 };
 
-export type { HeistStatus };
+export type { OpsStatus };
+export type HeistStatus = OpsStatus;
 
 export default function StatusIndicator({
   status,
@@ -58,11 +55,13 @@ export default function StatusIndicator({
   const config = STATUS_STYLES[status];
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[rgba(0,255,159,0.04)] p-4">
+    <div className="surface p-4">
       <div className="flex items-center gap-3">
         <span className={`h-3 w-3 rounded-full ${config.dotClassName}`} />
         <div>
-          <p className={`status-text ${config.textClassName}`}>{status}</p>
+          <p className={`font-mono-system text-xs ${config.textClassName}`}>
+            {status}
+          </p>
           <p className="mt-1 text-sm text-[var(--text-soft)]">
             {error ? error : config.description}
           </p>

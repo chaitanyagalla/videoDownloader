@@ -3,9 +3,10 @@ import { Server as SocketServer } from "socket.io";
 import { z } from "zod";
 import { execSync } from "child_process";
 import { randomUUID } from "crypto";
+import fs from "fs/promises";
+import path from "path";
 import {
   createDownload,
-  findDownloadById,
   findDownloadByIdForUser,
   findAllDownloads,
   findDownloadsByUserId,
@@ -17,13 +18,23 @@ import {
   deleteDownloadForUser,
 } from "../models/downloadModel";
 import { startDownload } from "./ytdlpService";
-import { detectPlatform, isSupportedUrl, isValidUrl } from "../utils/helpers";
+import {
+  detectPlatform,
+  getDownloadsFolder,
+  isSupportedUrl,
+  isValidUrl,
+  maskUrl,
+} from "../utils/helpers";
 import { AppError } from "../utils/AppError";
 import { logger } from "../utils/logger";
 import { DownloadRecord, ServerToClientEvents, ClientToServerEvents } from "../types";
 
 const ANONYMOUS_DOWNLOAD_RETENTION_MS = 60 * 60 * 1000;
-const anonymousDownloads = new Map<string, DownloadRecord>();
+type AnonymousDownloadRecord = DownloadRecord & {
+  anonymousClientId: string;
+};
+
+const anonymousDownloads = new Map<string, AnonymousDownloadRecord>();
 
 export function getDownloadRoom(downloadId: string): string {
   return `download:${downloadId}`;
@@ -32,10 +43,11 @@ export function getDownloadRoom(downloadId: string): string {
 function createAnonymousDownload(data: {
   url: string;
   platform: DownloadRecord["platform"];
+  anonymousClientId: string;
 }): DownloadRecord {
   const now = new Date();
 
-  const record: DownloadRecord = {
+  const record: AnonymousDownloadRecord = {
     id: randomUUID(),
     url: data.url,
     platform: data.platform,
@@ -49,10 +61,11 @@ function createAnonymousDownload(data: {
     errorMsg: null,
     createdAt: now,
     updatedAt: now,
+    anonymousClientId: data.anonymousClientId,
   };
 
   anonymousDownloads.set(record.id, record);
-  return record;
+  return toPublicDownloadRecord(record);
 }
 
 function updateAnonymousDownload(
@@ -73,8 +86,58 @@ function updateAnonymousDownload(
 
 function scheduleAnonymousCleanup(id: string): void {
   setTimeout(() => {
+    const record = anonymousDownloads.get(id);
+    if (record?.filePath) {
+      void deleteDownloadedFile(record.filePath);
+    }
     anonymousDownloads.delete(id);
   }, ANONYMOUS_DOWNLOAD_RETENTION_MS).unref();
+}
+
+function getPublicFilePath(filePath: string | null): string | null {
+  return filePath ? path.basename(filePath) : null;
+}
+
+function toPublicDownloadRecord(record: DownloadRecord): DownloadRecord {
+  return {
+    ...record,
+    filePath: getPublicFilePath(record.filePath),
+  };
+}
+
+function isAnonymousOwner(
+  record: AnonymousDownloadRecord,
+  anonymousClientId?: string | null
+): boolean {
+  return Boolean(anonymousClientId && record.anonymousClientId === anonymousClientId);
+}
+
+async function deleteDownloadedFile(filePath: string | null): Promise<void> {
+  if (!filePath) {
+    return;
+  }
+
+  const downloadsDir = path.resolve(getDownloadsFolder());
+  const resolvedPath = path.resolve(filePath);
+  const isInsideDownloadsDir =
+    resolvedPath === downloadsDir ||
+    resolvedPath.startsWith(`${downloadsDir}${path.sep}`);
+
+  if (!isInsideDownloadsDir) {
+    logger.warn("Refusing to delete file outside downloads directory", {
+      fileName: path.basename(filePath),
+    });
+    return;
+  }
+
+  try {
+    await fs.rm(resolvedPath, { force: true });
+  } catch (err) {
+    logger.warn("Failed to delete downloaded file", {
+      fileName: path.basename(filePath),
+      err,
+    });
+  }
 }
 
 // ─── Validation Schema ─────────────────────────────────────────────────────
@@ -154,6 +217,7 @@ export function startJobCleanup(
           ageInDays > failedRetentionDays
         ) {
           try {
+            await deleteDownloadedFile(download.filePath);
             await deleteDownload(download.id);
             cleanedCount++;
             logger.debug("Cleaned old failed download", {
@@ -171,6 +235,7 @@ export function startJobCleanup(
           ageInDays > completedRetentionDays
         ) {
           try {
+            await deleteDownloadedFile(download.filePath);
             await deleteDownload(download.id);
             cleanedCount++;
             logger.debug("Cleaned old completed download", {
@@ -203,7 +268,8 @@ export function startJobCleanup(
 // ─── Service Functions ─────────────────────────────────────────────────────
 
 export async function getAllDownloads(): Promise<DownloadRecord[]> {
-  return findAllDownloads();
+  const records = await findAllDownloads();
+  return records.map(toPublicDownloadRecord);
 }
 
 export async function getDownloadsForUser(
@@ -213,28 +279,44 @@ export async function getDownloadsForUser(
     return [];
   }
 
-  return findDownloadsByUserId(userId);
+  const records = await findDownloadsByUserId(userId);
+  return records.map(toPublicDownloadRecord);
 }
 
 export async function getDownloadById(
   id: string,
-  userId?: string
+  userId?: string,
+  anonymousClientId?: string | null
 ): Promise<DownloadRecord> {
   if (!id) throw AppError.badRequest("Download ID is required");
 
+  const anonymousRecord = anonymousDownloads.get(id);
   const record = userId
     ? await findDownloadByIdForUser(id, userId)
-    : anonymousDownloads.get(id) ?? null;
+    : anonymousRecord && isAnonymousOwner(anonymousRecord, anonymousClientId)
+      ? anonymousRecord
+      : null;
 
   if (!record) throw AppError.notFound("Download");
 
-  return record;
+  return toPublicDownloadRecord(record);
 }
 
 export async function getDownloadSnapshot(
-  id: string
+  id: string,
+  userId?: string,
+  anonymousClientId?: string | null
 ): Promise<DownloadRecord | null> {
-  return anonymousDownloads.get(id) ?? findDownloadById(id);
+  const anonymousRecord = anonymousDownloads.get(id);
+
+  if (!userId) {
+    return anonymousRecord && isAnonymousOwner(anonymousRecord, anonymousClientId)
+      ? toPublicDownloadRecord(anonymousRecord)
+      : null;
+  }
+
+  const record = await findDownloadByIdForUser(id, userId);
+  return record ? toPublicDownloadRecord(record) : null;
 }
 
 // export async function initiateDownload(
@@ -296,18 +378,27 @@ export async function getDownloadSnapshot(
 export async function initiateDownload(
   dto: CreateDownloadDto,
   io: SocketServer<ClientToServerEvents, ServerToClientEvents>,
-  userId?: string
+  userId?: string,
+  anonymousClientId?: string
 ): Promise<DownloadRecord> {
   const platform = detectPlatform(dto.url);
   logger.info("Initiating download", {
-    url: dto.url,
+    url: maskUrl(dto.url),
     platform,
     historyEnabled: Boolean(userId),
   });
 
+  if (!userId && !anonymousClientId) {
+    throw AppError.unauthorized("Guest download session is missing");
+  }
+
   const record = userId
     ? await createDownload({ url: dto.url, platform, userId })
-    : createAnonymousDownload({ url: dto.url, platform });
+    : createAnonymousDownload({
+        url: dto.url,
+        platform,
+        anonymousClientId: anonymousClientId as string,
+      });
 
   let lastDbWriteAt = 0;
   const DB_WRITE_INTERVAL_MS = 2000;
@@ -362,16 +453,21 @@ export async function initiateDownload(
     },
 
     onCompleted: (filePath, fileSize) => {
+      const publicFilePath = getPublicFilePath(filePath) ?? "download.mp4";
+
       io.to(getDownloadRoom(record.id)).emit("download:completed", {
         id: record.id,
-        filePath,
+        filePath: publicFilePath,
         fileSize,
       });
 
       if (userId) {
         markDownloadCompleted(record.id, { filePath, fileSize })
           .then(() =>
-            logger.info("Download completed", { id: record.id, filePath })
+            logger.info("Download completed", {
+              id: record.id,
+              fileName: publicFilePath,
+            })
           )
           .catch((err) =>
             logger.error("Failed to persist completion", { id: record.id, err })
@@ -388,7 +484,7 @@ export async function initiateDownload(
         scheduleAnonymousCleanup(record.id);
         logger.info("Anonymous download completed", {
           id: record.id,
-          filePath,
+          fileName: publicFilePath,
         });
       }
     },
@@ -420,16 +516,24 @@ export async function initiateDownload(
 
 export async function removeDownload(
   id: string,
-  userId?: string
+  userId?: string,
+  anonymousClientId?: string | null
 ): Promise<void> {
   if (!id) throw AppError.badRequest("Download ID is required");
 
   if (!userId) {
+    const record = anonymousDownloads.get(id);
+    if (!record || !isAnonymousOwner(record, anonymousClientId)) {
+      throw AppError.notFound("Download");
+    }
+
+    await deleteDownloadedFile(record.filePath);
     anonymousDownloads.delete(id);
     return;
   }
 
   const record = await findDownloadByIdForUser(id, userId);
   if (!record) throw AppError.notFound("Download");
+  await deleteDownloadedFile(record.filePath);
   await deleteDownloadForUser(id, userId);
 }

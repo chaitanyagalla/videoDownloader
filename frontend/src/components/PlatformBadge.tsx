@@ -39,13 +39,13 @@ export function PlatformBadge({
 
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 font-mono-system text-[10px] uppercase tracking-[0.12em] text-[var(--text-neutral)] ${className}`.trim()}
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--border-soft)] bg-[rgba(255,255,255,0.035)] px-2 py-1 font-mono-system text-[11px] text-[var(--text-soft)] ${className}`.trim()}
     >
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${config.dotClassName}`}
       />
-      <span className="text-[var(--text-dim)]">{config.shortLabel}</span>
+      <span className="text-[var(--text-muted)]">{config.shortLabel}</span>
       <span className="hidden md:inline">{config.label}</span>
     </span>
   );

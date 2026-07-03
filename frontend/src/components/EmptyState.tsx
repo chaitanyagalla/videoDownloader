@@ -43,7 +43,7 @@ export function EmptyState() {
         ).map(({ label, color, bg }) => (
           <span
             key={label}
-            className="rounded-full px-3 py-1 font-mono text-[10px] uppercase tracking-wider"
+            className="rounded-md px-3 py-1 font-mono text-[10px] uppercase"
             style={{ color, backgroundColor: bg }}
           >
             {label}

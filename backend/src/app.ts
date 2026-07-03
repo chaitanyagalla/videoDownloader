@@ -17,6 +17,10 @@ export function createApp(
 ): Application {
   const app = express();
 
+  if (env.TRUST_PROXY_HOPS > 0) {
+    app.set("trust proxy", env.TRUST_PROXY_HOPS);
+  }
+
   // ── Security ──────────────────────────────────────────────────────────
   app.use(
     helmet({

@@ -6,6 +6,7 @@ import { env } from "../config/env";
 import { logger } from "../utils/logger";
 import {
   getDownloadsFolder,
+  maskUrl,
   parseYtdlpProgress,
   parseYtdlpTitle,
 } from "../utils/helpers";
@@ -23,6 +24,7 @@ export interface YtdlpCallbacks {
 
 // Active processes map for cancellation support
 const activeProcesses = new Map<string, ChildProcess>();
+const MAX_STDERR_BUFFER_LENGTH = 16 * 1024;
 
 /**
  * Verifies yt-dlp is installed and executable.
@@ -44,6 +46,13 @@ export function startDownload(
   url: string,
   callbacks: YtdlpCallbacks,
 ): () => void {
+  if (activeProcesses.size >= env.MAX_CONCURRENT_DOWNLOADS) {
+    setImmediate(() => {
+      callbacks.onFailed("Server is busy. Please try again in a moment.");
+    });
+    return () => undefined;
+  }
+
   const outputDir = getDownloadsFolder();
 
   // Ensure the Downloads folder exists
@@ -51,14 +60,26 @@ export function startDownload(
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // Output template: Downloads/<title>.<ext>
-  const outputTemplate = path.join(outputDir, "%(title)s.%(ext)s");
+  const outputTemplate = path.join(outputDir, `${downloadId}.%(ext)s`);
 
   const args = [
-    url,
-    "--output",
-    outputTemplate,
     "--no-playlist", // single video only
+    "--playlist-items",
+    "1",
+    "--max-filesize",
+    `${env.MAX_DOWNLOAD_FILESIZE_MB}M`,
+    "--match-filter",
+    `duration <= ${env.MAX_VIDEO_DURATION_SECONDS} & !is_live`,
+    "--socket-timeout",
+    "30",
+    "--retries",
+    "3",
+    "--fragment-retries",
+    "3",
+    "--no-call-home",
+    "--no-cache-dir",
+    "--restrict-filenames",
+    "--windows-filenames",
     "--merge-output-format",
     "mp4", // always produce .mp4
     "--newline", // one progress line per newline
@@ -71,25 +92,47 @@ export function startDownload(
     // not available" failures. Let yt-dlp use the safer default clients.
     "--extractor-args",
     "youtube:player_client=default,-web,-mweb",
-    "--ffmpeg-location", "C:\\yt-dlp",
     // yt-dlp's recommended "best available" selector for normal downloads.
-    "--format", "bv*+ba/b"
+    "--format",
+    "bv*+ba/b",
+    "--output",
+    outputTemplate,
   ];
+
+  if (env.FFMPEG_LOCATION) {
+    args.push("--ffmpeg-location", env.FFMPEG_LOCATION);
+  }
+
+  args.push(url);
 
   logger.info("Spawning yt-dlp", {
     downloadId,
-    args: [env.YTDLP_PATH, ...args].join(" "),
+    url: maskUrl(url),
+    outputDir,
+    maxFileSizeMb: env.MAX_DOWNLOAD_FILESIZE_MB,
+    maxDurationSeconds: env.MAX_VIDEO_DURATION_SECONDS,
   });
 
-
   const proc = spawn(env.YTDLP_PATH, args, {
-    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    env: buildChildProcessEnv(),
   });
 
   activeProcesses.set(downloadId, proc);
 
   let outputFilePath: string | null = null;
   let stderrBuffer = "";
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (settled) {
+      return;
+    }
+
+    settled = true;
+    activeProcesses.delete(downloadId);
+    proc.kill("SIGTERM");
+    callbacks.onFailed("Download timed out. Please try a shorter video.");
+  }, env.DOWNLOAD_TIMEOUT_MS);
+  timeout.unref();
 
   // ── stdout ────────────────────────────────────────────────────────────
   proc.stdout?.setEncoding("utf-8");
@@ -155,17 +198,26 @@ export function startDownload(
   // ── stderr ────────────────────────────────────────────────────────────
   proc.stderr?.setEncoding("utf-8");
   proc.stderr?.on("data", (chunk: string) => {
-    stderrBuffer += chunk;
-    logger.warn("yt-dlp stderr", { downloadId, chunk });
+    stderrBuffer = (stderrBuffer + chunk).slice(-MAX_STDERR_BUFFER_LENGTH);
+    logger.warn("yt-dlp stderr", {
+      downloadId,
+      message: truncateLogMessage(chunk),
+    });
   });
 
   // ── close ─────────────────────────────────────────────────────────────
   proc.on("close", (code) => {
+    if (settled) {
+      return;
+    }
+
+    settled = true;
+    clearTimeout(timeout);
     activeProcesses.delete(downloadId);
 
     if (code === 0) {
       // Resolve the actual output path
-      const resolvedPath = outputFilePath ?? findLatestFile(outputDir);
+      const resolvedPath = resolveDownloadedPath(outputFilePath, outputDir);
 
       if (!resolvedPath) {
         callbacks.onFailed(
@@ -192,6 +244,12 @@ export function startDownload(
   });
 
   proc.on("error", (err) => {
+    if (settled) {
+      return;
+    }
+
+    settled = true;
+    clearTimeout(timeout);
     activeProcesses.delete(downloadId);
     const message = err.message.includes("ENOENT")
       ? `yt-dlp not found at "${env.YTDLP_PATH}". Please install yt-dlp and update YTDLP_PATH in .env`
@@ -202,6 +260,8 @@ export function startDownload(
   // Return cleanup function
   return () => {
     if (activeProcesses.has(downloadId)) {
+      settled = true;
+      clearTimeout(timeout);
       proc.kill("SIGTERM");
       activeProcesses.delete(downloadId);
     }
@@ -224,6 +284,53 @@ export function cancelDownload(downloadId: string): boolean {
 /**
  * Finds the most recently modified file in a directory (fallback).
  */
+function buildChildProcessEnv(): NodeJS.ProcessEnv {
+  return {
+    HOME: process.env["HOME"],
+    PATH: process.env["PATH"],
+    Path: process.env["Path"],
+    PATHEXT: process.env["PATHEXT"],
+    SYSTEMROOT: process.env["SYSTEMROOT"],
+    SystemRoot: process.env["SystemRoot"],
+    TEMP: process.env["TEMP"],
+    TMP: process.env["TMP"],
+    PYTHONUNBUFFERED: "1",
+  };
+}
+
+function resolveDownloadedPath(
+  candidatePath: string | null,
+  outputDir: string
+): string | null {
+  const resolvedOutputDir = path.resolve(outputDir);
+  const resolvedCandidate = candidatePath
+    ? path.resolve(candidatePath)
+    : findLatestFile(outputDir);
+
+  if (!resolvedCandidate) {
+    return null;
+  }
+
+  if (
+    resolvedCandidate !== resolvedOutputDir &&
+    !resolvedCandidate.startsWith(`${resolvedOutputDir}${path.sep}`)
+  ) {
+    logger.warn("Ignoring yt-dlp output outside downloads directory", {
+      fileName: path.basename(resolvedCandidate),
+    });
+    return null;
+  }
+
+  return resolvedCandidate;
+}
+
+function truncateLogMessage(message: string): string {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  return normalized.length > 500
+    ? `${normalized.slice(0, 500)}...`
+    : normalized;
+}
+
 function findLatestFile(dir: string): string | null {
   try {
     const files = fs
@@ -231,8 +338,10 @@ function findLatestFile(dir: string): string | null {
       .map((name) => {
         const fullPath = path.join(dir, name);
         const stat = fs.statSync(fullPath);
-        return { fullPath, mtime: stat.mtimeMs };
+        return { fullPath, name, isFile: stat.isFile(), mtime: stat.mtimeMs };
       })
+      .filter((f) => f.isFile)
+      .filter((f) => !/\.(info\.json|json|ytdl|part)$/i.test(f.name))
       .filter((f) => f.mtime > Date.now() - 5 * 60 * 1000) // modified in last 5 min
       .sort((a, b) => b.mtime - a.mtime);
 

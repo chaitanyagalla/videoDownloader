@@ -1,9 +1,9 @@
 export type BackgroundMissionState =
   | "IDLE"
-  | "LOCKING TARGET"
-  | "DOWNLOADING"
-  | "MISSION COMPLETED"
-  | "MISSION FAILED";
+  | "CAPTURE"
+  | "PROCESSING"
+  | "READY"
+  | "REVIEW";
 
 type BackgroundListener = (status: BackgroundMissionState) => void;
 

@@ -8,8 +8,14 @@ import {
   removeDownload,
   CreateDownloadDto,
 } from "../services/downloadService";
+import {
+  anonymousClientCookieName,
+  buildAnonymousClientCookie,
+  createAnonymousClientToken,
+} from "../services/authService";
 import { ApiResponse } from "../types";
 import { DownloadRecord, ServerToClientEvents, ClientToServerEvents } from "../types";
+import { getCookieValue } from "../utils/cookies";
 
 /**
  * Controller factory – injects the Socket.io server instance so
@@ -44,7 +50,8 @@ export function createDownloadController(
       try {
         const download = await getDownloadById(
           req.params["id"] ?? "",
-          req.authUser?.id
+          req.authUser?.id,
+          getCookieValue(req.headers.cookie, anonymousClientCookieName)
         );
         const response: ApiResponse<DownloadRecord> = {
           success: true,
@@ -64,7 +71,21 @@ export function createDownloadController(
     async create(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
         const dto = req.body as CreateDownloadDto;
-        const download = await initiateDownload(dto, io, req.authUser?.id);
+        let anonymousClientId: string | undefined;
+
+        if (!req.authUser) {
+          anonymousClientId =
+            getCookieValue(req.headers.cookie, anonymousClientCookieName) ??
+            createAnonymousClientToken();
+          res.append("Set-Cookie", buildAnonymousClientCookie(anonymousClientId));
+        }
+
+        const download = await initiateDownload(
+          dto,
+          io,
+          req.authUser?.id,
+          anonymousClientId
+        );
         const response: ApiResponse<DownloadRecord> = {
           success: true,
           data: download,
@@ -81,7 +102,11 @@ export function createDownloadController(
      */
     async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
       try {
-        await removeDownload(req.params["id"] ?? "", req.authUser?.id);
+        await removeDownload(
+          req.params["id"] ?? "",
+          req.authUser?.id,
+          getCookieValue(req.headers.cookie, anonymousClientCookieName)
+        );
         const response: ApiResponse<null> = { success: true, data: null };
         res.status(200).json(response);
       } catch (err) {

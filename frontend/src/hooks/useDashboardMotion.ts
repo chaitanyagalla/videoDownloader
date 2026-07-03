@@ -2,15 +2,15 @@
 
 import { useEffect, type RefObject } from "react";
 import gsap from "gsap";
-import type { HeistStatus } from "@/components/heist/StatusIndicator";
+import type { OpsStatus } from "@/components/heist/StatusIndicator";
 
 type UseDashboardMotionArgs = {
   rootRef: RefObject<HTMLElement | null>;
-  status: HeistStatus;
+  status: OpsStatus;
 };
 
-const STABLE_ACCENT = "rgba(122,255,193,0.18)";
-const PANEL_BORDER = "rgba(176,200,188,0.16)";
+const STABLE_ACCENT = "rgba(101,230,173,0.22)";
+const PANEL_BORDER = "rgba(219,234,226,0.14)";
 
 function queryAll<T extends Element>(
   root: ParentNode,
@@ -123,7 +123,7 @@ export function useDashboardMotion({
 
     const reactivePanels = queryAll<HTMLElement>(
       root,
-      '[data-mission-reactive="true"]'
+      '[data-ops-reactive="true"]'
     );
     const heroTitle = root.querySelector<HTMLElement>(
       '[data-hero-title="true"]'

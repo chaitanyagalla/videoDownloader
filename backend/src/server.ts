@@ -7,8 +7,32 @@ import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { verifyYtdlp } from "./services/ytdlpService";
 import { getDownloadRoom, getDownloadSnapshot } from "./services/downloadService";
+import {
+  anonymousClientCookieName,
+  getUserBySessionToken,
+} from "./services/authService";
+import { getCookieValue } from "./utils/cookies";
 import { ServerToClientEvents, ClientToServerEvents } from "./types";
 // import { findDownloadById } from "./models/downloadModel";
+
+function normalizeCookieHeader(
+  cookieHeader: string | string[] | undefined
+): string | undefined {
+  return Array.isArray(cookieHeader) ? cookieHeader.join("; ") : cookieHeader;
+}
+
+async function getSocketIdentity(
+  cookieHeader: string | string[] | undefined
+): Promise<{ userId?: string; anonymousClientId?: string | null }> {
+  const cookies = normalizeCookieHeader(cookieHeader);
+  const sessionToken = getCookieValue(cookies, env.AUTH_COOKIE_NAME);
+  const user = sessionToken ? await getUserBySessionToken(sessionToken) : null;
+
+  return {
+    userId: user?.id,
+    anonymousClientId: getCookieValue(cookies, anonymousClientCookieName),
+  };
+}
 
 async function bootstrap(): Promise<void> {
   // ── 1. Verify yt-dlp ──────────────────────────────────────────────────
@@ -89,18 +113,23 @@ async function bootstrap(): Promise<void> {
   // Remove subscribe:download handler entirely — rooms not used anymore
 
   socket.on("subscribe:download", async (downloadId) => {
-    if (!downloadId) {
+    if (typeof downloadId !== "string" || downloadId.length > 100) {
       return;
     }
 
-    const room = getDownloadRoom(downloadId);
-    await socket.join(room);
-
     try {
-      const record = await getDownloadSnapshot(downloadId);
+      const identity = await getSocketIdentity(socket.handshake.headers.cookie);
+      const record = await getDownloadSnapshot(
+        downloadId,
+        identity.userId,
+        identity.anonymousClientId
+      );
       if (!record) {
         return;
       }
+
+      const room = getDownloadRoom(downloadId);
+      await socket.join(room);
 
       if (record.title) {
         socket.emit("download:title", {
@@ -136,7 +165,7 @@ async function bootstrap(): Promise<void> {
   });
 
   socket.on("unsubscribe:download", (downloadId) => {
-    if (!downloadId) {
+    if (typeof downloadId !== "string" || downloadId.length > 100) {
       return;
     }
 
