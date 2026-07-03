@@ -263,6 +263,3 @@ If the remote is already added, use:
 git push -u origin main
 ```
 
-## License
-
-Add a license before publishing if you want others to reuse or contribute to this project.
