@@ -233,33 +233,3 @@ Client to server:
 | --- | --- |
 | `subscribe:download` | `downloadId` |
 | `unsubscribe:download` | `downloadId` |
-
-## GitHub Push Checklist
-
-Before pushing, make sure these files stay local and are not committed:
-
-- `node_modules/`
-- `.next/`
-- `dist/`
-- `.env` and `.env.local`
-- local logs
-- local database files
-- downloaded videos and temporary files
-
-This repository already includes a `.gitignore` for those files.
-
-Typical first push:
-
-```bash
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-```
-
-If the remote is already added, use:
-
-```bash
-git push -u origin main
-```
-
