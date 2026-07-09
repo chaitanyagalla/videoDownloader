@@ -2,6 +2,15 @@
 import "dotenv/config";
 import { z } from "zod";
 
+const optionalTrimmedString = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().optional());
+
 const envSchema = z.object({
   PORT: z
     .string()
@@ -15,9 +24,9 @@ const envSchema = z.object({
     .default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   FRONTEND_URL: z.string().url().default("http://localhost:3000"),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z.string().url().optional(),
+  GOOGLE_CLIENT_ID: optionalTrimmedString,
+  GOOGLE_CLIENT_SECRET: optionalTrimmedString,
+  GOOGLE_CALLBACK_URL: optionalTrimmedString.pipe(z.string().url().optional()),
   AUTH_COOKIE_NAME: z.string().default("videosave_session"),
   AUTH_SESSION_DAYS: z
     .string()
@@ -27,8 +36,13 @@ const envSchema = z.object({
       message: "AUTH_SESSION_DAYS must be a positive number",
     }),
   YTDLP_PATH: z.string().default("yt-dlp"),
-  FFMPEG_LOCATION: z.string().optional(),
-  DOWNLOADS_DIR: z.string().optional(),
+  YTDLP_COOKIES_FILE: optionalTrimmedString,
+  YTDLP_COOKIES_FROM_BROWSER: optionalTrimmedString,
+  // Optional proxy for yt-dlp (e.g. http://user:pass@host:port or socks5://host:port).
+  // Useful as a fallback when a datacenter IP is flagged by YouTube.
+  YTDLP_PROXY: optionalTrimmedString,
+  FFMPEG_LOCATION: optionalTrimmedString,
+  DOWNLOADS_DIR: optionalTrimmedString,
   MAX_CONCURRENT_DOWNLOADS: z
     .string()
     .default("2")

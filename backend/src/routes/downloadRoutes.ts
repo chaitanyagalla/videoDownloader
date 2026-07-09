@@ -19,6 +19,9 @@ export function createDownloadRouter(
 
   router.get("/", controller.list);
 
+  // GET /api/downloads/:id/file — send completed file to user's browser
+  router.get("/:id/file", controller.file);
+
   // GET /api/downloads/:id — get one
   router.get("/:id", controller.get);
 

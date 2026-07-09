@@ -4,7 +4,9 @@ import { Server as SocketServer } from "socket.io";
 import {
   getDownloadsForUser,
   getDownloadById,
+  getDownloadFileForDelivery,
   initiateDownload,
+  markDeliveredToDevice,
   removeDownload,
   CreateDownloadDto,
 } from "../services/downloadService";
@@ -16,6 +18,7 @@ import {
 import { ApiResponse } from "../types";
 import { DownloadRecord, ServerToClientEvents, ClientToServerEvents } from "../types";
 import { getCookieValue } from "../utils/cookies";
+import { logger } from "../utils/logger";
 
 /**
  * Controller factory – injects the Socket.io server instance so
@@ -58,6 +61,46 @@ export function createDownloadController(
           data: download,
         };
         res.status(200).json(response);
+      } catch (err) {
+        next(err);
+      }
+    },
+
+    /**
+     * GET /api/downloads/:id/file
+     * Sends the completed file to the user's browser, then removes the
+     * temporary server copy so videos are not kept in cloud storage.
+     */
+    async file(req: Request, res: Response, next: NextFunction): Promise<void> {
+      try {
+        const anonymousClientId = getCookieValue(
+          req.headers.cookie,
+          anonymousClientCookieName
+        );
+        const { filePath, fileName } = await getDownloadFileForDelivery(
+          req.params["id"] ?? "",
+          req.authUser?.id,
+          anonymousClientId
+        );
+
+        res.download(filePath, fileName, (err) => {
+          if (err) {
+            next(err);
+            return;
+          }
+
+          markDeliveredToDevice(
+            req.params["id"] ?? "",
+            filePath,
+            req.authUser?.id,
+            anonymousClientId
+          ).catch((cleanupErr) =>
+            logger.warn("Failed to remove delivered file", {
+              id: req.params["id"],
+              cleanupErr,
+            })
+          );
+        });
       } catch (err) {
         next(err);
       }

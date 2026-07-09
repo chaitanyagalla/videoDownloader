@@ -7,6 +7,7 @@ interface DownloadListProps {
   downloads: DownloadRecord[];
   isLoading: boolean;
   onRemove: (id: string) => Promise<void>;
+  onDownload: (id: string) => Promise<void>;
   isHistoryEnabled: boolean;
 }
 
@@ -16,9 +17,9 @@ function SkeletonCard() {
       <div className="animate-pulse">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="h-5 w-40 rounded bg-[rgba(255,255,255,0.08)]" />
+            <div className="h-5 w-28 rounded bg-[rgba(255,255,255,0.08)]" />
             <div className="mt-3 h-4 w-4/5 rounded bg-[rgba(255,255,255,0.07)]" />
-            <div className="mt-4 h-16 rounded-lg bg-[rgba(255,255,255,0.05)]" />
+            <div className="mt-3 h-7 w-48 rounded bg-[rgba(255,255,255,0.05)]" />
           </div>
           <div className="h-8 w-8 rounded-lg bg-[rgba(255,255,255,0.08)]" />
         </div>
@@ -52,6 +53,7 @@ export function DownloadList({
   downloads,
   isLoading,
   onRemove,
+  onDownload,
   isHistoryEnabled,
 }: DownloadListProps) {
   if (isLoading) {
@@ -89,6 +91,7 @@ export function DownloadList({
             key={download.id}
             download={download}
             onRemove={onRemove}
+            onDownload={onDownload}
           />
         ))}
       </div>

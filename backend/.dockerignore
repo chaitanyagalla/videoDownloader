@@ -1,0 +1,9 @@
+node_modules
+dist
+downloads
+.env
+.env.*
+secrets
+npm-debug.log*
+*.log
+tsconfig.tsbuildinfo

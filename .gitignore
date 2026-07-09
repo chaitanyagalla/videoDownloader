@@ -20,6 +20,8 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+secrets/
+*cookies*.txt
 
 # Logs
 logs/

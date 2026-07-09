@@ -128,24 +128,19 @@ interface YtdlpProgress {
  * Example: "[download]  45.3% of 10.23MiB at 1.23MiB/s ETA 00:05"
  */
 export function parseYtdlpProgress(line: string): YtdlpProgress | null {
-  const progressMatch = line.match(
-    /\[download\]\s+([\d.]+)%\s+of\s+[\d.]+\S+\s+at\s+([\d.]+\S+)\s+ETA\s+([\d:]+)/
-  );
+  const percentMatch = line.match(/\[download\]\s+([\d.]+)%/);
 
-  if (progressMatch) {
-    const [, percentStr, speed, eta] = progressMatch;
+  if (percentMatch) {
+    const [, percentStr] = percentMatch;
     const percent = parseFloat(percentStr ?? "0");
+    const speedMatch = line.match(/\s+at\s+(.+?)(?:\s+ETA\s+|\s*$)/);
+    const etaMatch = line.match(/\s+ETA\s+([^\s]+)/);
+
     return {
       percent: isNaN(percent) ? 0 : Math.min(100, Math.max(0, percent)),
-      speed: speed ?? null,
-      eta: eta ?? null,
+      speed: speedMatch?.[1]?.trim() ?? null,
+      eta: etaMatch?.[1]?.trim() ?? null,
     };
-  }
-
-  // Handle "100% of ..." (completed)
-  const doneMatch = line.match(/\[download\]\s+100%/);
-  if (doneMatch) {
-    return { percent: 100, speed: null, eta: null };
   }
 
   return null;

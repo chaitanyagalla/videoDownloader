@@ -14,6 +14,7 @@ import {
   updateDownloadTitle,
   markDownloadCompleted,
   markDownloadFailed,
+  clearDownloadFile,
   deleteDownload,
   deleteDownloadForUser,
 } from "../models/downloadModel";
@@ -30,6 +31,7 @@ import { logger } from "../utils/logger";
 import { DownloadRecord, ServerToClientEvents, ClientToServerEvents } from "../types";
 
 const ANONYMOUS_DOWNLOAD_RETENTION_MS = 60 * 60 * 1000;
+const AUTHENTICATED_FILE_RETENTION_MS = 60 * 60 * 1000;
 type AnonymousDownloadRecord = DownloadRecord & {
   anonymousClientId: string;
 };
@@ -138,6 +140,38 @@ async function deleteDownloadedFile(filePath: string | null): Promise<void> {
       err,
     });
   }
+}
+
+function getPrivateDownloadPath(filePath: string | null): string | null {
+  if (!filePath) {
+    return null;
+  }
+
+  const downloadsDir = path.resolve(getDownloadsFolder());
+  const resolvedPath = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(downloadsDir, filePath);
+  const isInsideDownloadsDir =
+    resolvedPath === downloadsDir ||
+    resolvedPath.startsWith(`${downloadsDir}${path.sep}`);
+
+  if (!isInsideDownloadsDir) {
+    logger.warn("Refusing to serve file outside downloads directory", {
+      fileName: path.basename(filePath),
+    });
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+function scheduleAuthenticatedFileCleanup(id: string, filePath: string): void {
+  setTimeout(() => {
+    void deleteDownloadedFile(filePath);
+    clearDownloadFile(id).catch((err) =>
+      logger.warn("Failed to clear expired download file reference", { id, err })
+    );
+  }, AUTHENTICATED_FILE_RETENTION_MS).unref();
 }
 
 // ─── Validation Schema ─────────────────────────────────────────────────────
@@ -305,18 +339,77 @@ export async function getDownloadById(
 export async function getDownloadSnapshot(
   id: string,
   userId?: string,
-  anonymousClientId?: string | null
+  anonymousClientId?: string | null,
+  allowAnonymousWithoutCookie = false
 ): Promise<DownloadRecord | null> {
   const anonymousRecord = anonymousDownloads.get(id);
 
   if (!userId) {
-    return anonymousRecord && isAnonymousOwner(anonymousRecord, anonymousClientId)
+    return anonymousRecord &&
+      (isAnonymousOwner(anonymousRecord, anonymousClientId) ||
+        allowAnonymousWithoutCookie)
       ? toPublicDownloadRecord(anonymousRecord)
       : null;
   }
 
   const record = await findDownloadByIdForUser(id, userId);
   return record ? toPublicDownloadRecord(record) : null;
+}
+
+export async function getDownloadFileForDelivery(
+  id: string,
+  userId?: string,
+  anonymousClientId?: string | null
+): Promise<{ filePath: string; fileName: string }> {
+  if (!id) throw AppError.badRequest("Download ID is required");
+
+  const anonymousRecord = anonymousDownloads.get(id);
+  const record = userId
+    ? await findDownloadByIdForUser(id, userId)
+    : anonymousRecord && isAnonymousOwner(anonymousRecord, anonymousClientId)
+      ? anonymousRecord
+      : null;
+
+  if (!record) throw AppError.notFound("Download");
+  if (record.status !== "completed") {
+    throw AppError.badRequest("Download is not ready yet");
+  }
+
+  const filePath = getPrivateDownloadPath(record.filePath);
+  if (!filePath) throw AppError.notFound("Downloaded file");
+
+  try {
+    await fs.access(filePath);
+  } catch {
+    throw AppError.notFound("Downloaded file");
+  }
+
+  return {
+    filePath,
+    fileName: path.basename(filePath),
+  };
+}
+
+export async function markDeliveredToDevice(
+  id: string,
+  filePath: string,
+  userId?: string,
+  anonymousClientId?: string | null
+): Promise<void> {
+  await deleteDownloadedFile(filePath);
+
+  if (!userId) {
+    const record = anonymousDownloads.get(id);
+    if (record && isAnonymousOwner(record, anonymousClientId)) {
+      updateAnonymousDownload(id, {
+        filePath: null,
+        fileSize: null,
+      });
+    }
+    return;
+  }
+
+  await clearDownloadFile(id);
 }
 
 // export async function initiateDownload(
@@ -455,20 +548,20 @@ export async function initiateDownload(
     onCompleted: (filePath, fileSize) => {
       const publicFilePath = getPublicFilePath(filePath) ?? "download.mp4";
 
-      io.to(getDownloadRoom(record.id)).emit("download:completed", {
-        id: record.id,
-        filePath: publicFilePath,
-        fileSize,
-      });
-
       if (userId) {
         markDownloadCompleted(record.id, { filePath, fileSize })
-          .then(() =>
+          .then(() => {
+            io.to(getDownloadRoom(record.id)).emit("download:completed", {
+              id: record.id,
+              filePath: publicFilePath,
+              fileSize,
+            });
+            scheduleAuthenticatedFileCleanup(record.id, filePath);
             logger.info("Download completed", {
               id: record.id,
               fileName: publicFilePath,
-            })
-          )
+            });
+          })
           .catch((err) =>
             logger.error("Failed to persist completion", { id: record.id, err })
           );
@@ -482,6 +575,11 @@ export async function initiateDownload(
           eta: null,
         });
         scheduleAnonymousCleanup(record.id);
+        io.to(getDownloadRoom(record.id)).emit("download:completed", {
+          id: record.id,
+          filePath: publicFilePath,
+          fileSize,
+        });
         logger.info("Anonymous download completed", {
           id: record.id,
           fileName: publicFilePath,

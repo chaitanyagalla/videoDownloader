@@ -128,6 +128,16 @@ export async function markDownloadCompleted(
   return toDownloadRecord(record);
 }
 
+export async function clearDownloadFile(id: string): Promise<void> {
+  await prisma.download.update({
+    where: { id },
+    data: {
+      filePath: null,
+      fileSize: null,
+    },
+  });
+}
+
 export async function markDownloadFailed(
   id: string,
   errorMsg: string

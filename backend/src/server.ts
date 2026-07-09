@@ -5,7 +5,7 @@ import { createApp } from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/database";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
-import { verifyYtdlp } from "./services/ytdlpService";
+import { verifyYtdlp, checkCookieConfig } from "./services/ytdlpService";
 import { getDownloadRoom, getDownloadSnapshot } from "./services/downloadService";
 import {
   anonymousClientCookieName,
@@ -48,6 +48,9 @@ async function bootstrap(): Promise<void> {
     process.exit(1);
   }
   logger.info("✅  yt-dlp verified");
+
+  // Surface a clear warning when YouTube cookies are missing/misconfigured.
+  checkCookieConfig();
 
   // ── 2. Connect Database ───────────────────────────────────────────────
   await connectDatabase();
@@ -118,18 +121,19 @@ async function bootstrap(): Promise<void> {
     }
 
     try {
+      const room = getDownloadRoom(downloadId);
+      await socket.join(room);
+
       const identity = await getSocketIdentity(socket.handshake.headers.cookie);
       const record = await getDownloadSnapshot(
         downloadId,
         identity.userId,
-        identity.anonymousClientId
+        identity.anonymousClientId,
+        true
       );
       if (!record) {
         return;
       }
-
-      const room = getDownloadRoom(downloadId);
-      await socket.join(room);
 
       if (record.title) {
         socket.emit("download:title", {

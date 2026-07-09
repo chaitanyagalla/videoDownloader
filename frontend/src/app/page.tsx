@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "@/components/core/Navbar";
-import TerminalLogs from "@/components/heist/TerminalLogs";
 import { type OpsStatus } from "@/components/heist/StatusIndicator";
+import { CompletionToast, type Celebration } from "@/components/CompletionToast";
 import { DownloadList } from "@/components/DownloadList";
 import { PlatformBadge } from "@/components/PlatformBadge";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -26,9 +26,9 @@ function getCurrentOpsStatus(params: {
   isSubmitting: boolean;
   error: string | null;
   activeDownload: DownloadRecord | null;
-  latestDownload: DownloadRecord | null;
+  focusedDownload: DownloadRecord | null;
 }): OpsStatus {
-  const { isSubmitting, error, activeDownload, latestDownload } = params;
+  const { isSubmitting, error, activeDownload, focusedDownload } = params;
 
   if (isSubmitting) {
     return "CAPTURE";
@@ -38,11 +38,11 @@ function getCurrentOpsStatus(params: {
     return "PROCESSING";
   }
 
-  if (latestDownload?.status === "completed") {
+  if (focusedDownload?.status === "completed") {
     return "READY";
   }
 
-  if (latestDownload?.status === "failed" || error) {
+  if (error || focusedDownload?.status === "failed") {
     return "REVIEW";
   }
 
@@ -57,31 +57,6 @@ function getDisplayLabel(download: DownloadRecord | null): string | null {
   return download.title?.trim() || download.url;
 }
 
-function getLogStatusLabel(status: DownloadRecord["status"]): string {
-  switch (status) {
-    case "pending":
-      return "Queued";
-    case "downloading":
-      return "Processing";
-    case "completed":
-      return "Ready";
-    case "failed":
-      return "Review";
-    default:
-      return status;
-  }
-}
-
-function truncateForLog(value: string, maxLength = 68): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  const headLength = Math.max(28, Math.floor(maxLength * 0.6));
-  const tailLength = Math.max(12, maxLength - headLength - 3);
-  return `${value.slice(0, headLength)}...${value.slice(-tailLength)}`;
-}
-
 function truncateSource(url: string, maxLength = 52): string {
   try {
     const parsedUrl = new URL(url);
@@ -92,14 +67,6 @@ function truncateSource(url: string, maxLength = 52): string {
   } catch {
     return url.length > maxLength ? `${url.slice(0, maxLength)}...` : url;
   }
-}
-
-function getFileName(filePath: string | null | undefined): string | null {
-  if (!filePath) {
-    return null;
-  }
-
-  return filePath.split(/[\\/]/).pop() ?? filePath;
 }
 
 function ExternalLinkIcon() {
@@ -119,7 +86,6 @@ function ProcessingPanel({
   error: string | null;
   status: OpsStatus;
 }) {
-  const fileName = getFileName(download?.filePath);
   const progress = download ? Math.max(0, Math.min(100, download.progress)) : 0;
 
   const statusLabel =
@@ -128,7 +94,7 @@ function ProcessingPanel({
       : status === "PROCESSING"
       ? "Processing"
       : status === "READY"
-      ? "Ready"
+      ? "Download completed"
       : status === "REVIEW"
       ? "Review"
       : "Idle";
@@ -181,34 +147,23 @@ function ProcessingPanel({
 
             <div className="mt-5">
               <ProgressBar progress={download.progress} status={download.status} />
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-[var(--text-muted)]">
+                {download.speed ? <span>{download.speed}</span> : null}
+                {download.eta ? <span>ETA {download.eta}</span> : null}
+              </div>
             </div>
 
-            <div className="mt-5 grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-              <div className="surface p-3">
-                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
-                  Stage
-                </p>
-                <p className="mt-1 text-sm font-medium text-[var(--text-soft)]">
-                  {getLogStatusLabel(download.status)}
-                </p>
+            {download.status === "completed" ? (
+              <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-[rgba(140,243,198,0.28)] bg-[rgba(101,230,173,0.08)] p-3 text-sm leading-6 text-[var(--mint-strong)]">
+                <svg className="h-4 w-4 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>
+                  Download completed
+                  {download.fileSize ? ` - ${download.fileSize}` : ""}
+                </span>
               </div>
-              <div className="surface p-3">
-                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
-                  Timing
-                </p>
-                <p className="mt-1 text-sm font-medium text-[var(--text-soft)]">
-                  {download.eta ? `ETA ${download.eta}` : download.speed ?? "Stable"}
-                </p>
-              </div>
-              <div className="surface p-3">
-                <p className="font-mono-system text-[11px] text-[var(--text-dim)]">
-                  Output
-                </p>
-                <p className="mt-1 line-clamp-2 break-words text-sm font-medium text-[var(--text-soft)]">
-                  {fileName ?? "Pending"}
-                </p>
-              </div>
-            </div>
+            ) : null}
 
             {download.status === "failed" && download.errorMsg ? (
               <p className="mt-4 rounded-lg border border-[rgba(255,107,127,0.3)] bg-[rgba(255,107,127,0.08)] p-3 text-sm leading-6 text-[var(--danger)]">
@@ -219,11 +174,16 @@ function ProcessingPanel({
         ) : (
           <div className="mt-8">
             <h3 className="text-2xl font-semibold leading-8 text-[var(--text-main)]">
-              Ready for a source.
+              {status === "CAPTURE"
+                ? "Starting download..."
+                : status === "REVIEW"
+                  ? "Needs review."
+                  : "Ready for a source."}
             </h3>
             <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
-              The next captured link will appear here with transfer progress,
-              file output, and source access.
+              {status === "CAPTURE"
+                ? "The job is being created. Progress will appear here as soon as the transfer starts."
+                : "The next captured link will appear here with transfer progress."}
             </p>
             {error ? (
               <p className="mt-4 rounded-lg border border-[rgba(255,107,127,0.3)] bg-[rgba(255,107,127,0.08)] p-3 text-sm leading-6 text-[var(--danger)]">
@@ -249,12 +209,17 @@ export default function HomePage() {
     error,
     addDownload,
     removeDownload,
+    saveDownloadFile,
   } = useDownload({
     enabled: !auth.isLoading,
     historyKey,
   });
 
   const rootRef = useRef<HTMLDivElement>(null);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const previousStatusRef = useRef<Map<string, DownloadRecord["status"]>>(
+    new Map()
+  );
 
   const sortedDownloads = useMemo(() => {
     return sortDownloadsByNewest(downloads);
@@ -269,116 +234,49 @@ export default function HomePage() {
     );
   }, [sortedDownloads]);
 
-  const latestDownload = sortedDownloads[0] ?? null;
-  const focusedDownload = activeDownload ?? latestDownload;
+  // Keep the panel meaningful after a transfer finishes: fall back to the most
+  // recent record instead of blanking out.
+  const focusedDownload = activeDownload ?? sortedDownloads[0] ?? null;
 
   const currentStatus = getCurrentOpsStatus({
     isSubmitting,
     error,
     activeDownload,
-    latestDownload,
+    focusedDownload,
   });
+
+  // Fire a celebratory toast whenever a download transitions into "completed".
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+
+    for (const download of downloads) {
+      const prior = previousStatus.get(download.id);
+      if (
+        prior &&
+        prior !== "completed" &&
+        download.status === "completed"
+      ) {
+        setCelebration({
+          id: download.id,
+          title: download.title?.trim() || download.url,
+          fileSize: download.fileSize,
+        });
+      }
+    }
+
+    previousStatusRef.current = new Map(
+      downloads.map((download) => [download.id, download.status])
+    );
+  }, [downloads]);
 
   useDashboardMotion({
     rootRef,
     status: currentStatus,
   });
 
-  const terminalLogs = useMemo(() => {
-    const logs: string[] = ["VideoSave ready."];
-
-    if (auth.error) {
-      logs.push(`Account: ${auth.error}`);
-    } else {
-      logs.push(isHistoryEnabled ? "Archive sync enabled." : "Guest workspace.");
-    }
-
-    switch (currentStatus) {
-      case "CAPTURE":
-        logs.push("Source received.");
-        logs.push("Validating link.");
-        break;
-
-      case "PROCESSING":
-        logs.push("Source confirmed.");
-        logs.push("Transfer in progress.");
-        break;
-
-      case "READY":
-        logs.push("File saved.");
-        logs.push("Archive updated.");
-        break;
-
-      case "REVIEW":
-        logs.push("Download needs review.");
-        logs.push(error ?? "Check the item details.");
-        break;
-
-      default:
-        logs.push("Waiting for source.");
-        break;
-    }
-
-    if (focusedDownload) {
-      const label = getDisplayLabel(focusedDownload);
-
-      if (label) {
-        logs.push(`Item: ${truncateForLog(label)}`);
-      }
-
-      logs.push(`Platform: ${focusedDownload.platform}`);
-
-      if (
-        focusedDownload.status === "pending" ||
-        focusedDownload.status === "downloading"
-      ) {
-        logs.push(`Progress: ${focusedDownload.progress.toFixed(1)}%`);
-      }
-
-      if (focusedDownload.speed) {
-        logs.push(`Speed: ${focusedDownload.speed}`);
-      }
-
-      if (focusedDownload.eta) {
-        logs.push(`ETA: ${focusedDownload.eta}`);
-      }
-
-      if (focusedDownload.fileSize) {
-        logs.push(`File size: ${focusedDownload.fileSize}`);
-      }
-
-      if (focusedDownload.status === "completed" && focusedDownload.filePath) {
-        logs.push(`Saved: ${truncateForLog(focusedDownload.filePath)}`);
-      }
-
-      if (focusedDownload.status === "failed" && focusedDownload.errorMsg) {
-        logs.push(`Error: ${truncateForLog(focusedDownload.errorMsg)}`);
-      }
-    }
-
-    if (sortedDownloads.length > 0) {
-      logs.push("Recent archive:");
-
-      sortedDownloads.slice(0, 3).forEach((download) => {
-        const label = getDisplayLabel(download) ?? download.url;
-        logs.push(`${getLogStatusLabel(download.status)}: ${truncateForLog(label)}`);
-      });
-    }
-
-    return logs;
-  }, [
-    auth.error,
-    currentStatus,
-    error,
-    focusedDownload,
-    isHistoryEnabled,
-    sortedDownloads,
-  ]);
-
   return (
     <main className="relative min-h-dvh overflow-x-hidden">
       <Navbar
-        statusLabel={currentStatus}
         user={auth.user}
         isAuthLoading={auth.isLoading}
         isSigningOut={auth.isSigningOut}
@@ -411,14 +309,14 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="mt-5">
           <div data-motion="archive" data-ops-reactive="true">
             <Panel
               variant="archive"
               title={isHistoryEnabled ? "Archive" : "Guest Archive"}
               subtitle={
                 isHistoryEnabled
-                  ? "Saved sources, local outputs, and source links."
+                  ? "Saved source links."
                   : "Temporary downloads for this browser session."
               }
             >
@@ -426,23 +324,18 @@ export default function HomePage() {
                 downloads={sortedDownloads}
                 isLoading={isLoading}
                 onRemove={removeDownload}
+                onDownload={saveDownloadFile}
                 isHistoryEnabled={isHistoryEnabled}
               />
             </Panel>
           </div>
-
-          <aside data-motion="terminal" data-ops-reactive="true">
-            <Panel
-              variant="support"
-              title="Activity"
-              subtitle="Compact event stream."
-              className="h-full"
-            >
-              <TerminalLogs logs={terminalLogs} compact />
-            </Panel>
-          </aside>
         </section>
       </div>
+
+      <CompletionToast
+        celebration={celebration}
+        onDismiss={() => setCelebration(null)}
+      />
     </main>
   );
 }

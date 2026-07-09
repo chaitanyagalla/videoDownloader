@@ -1,13 +1,14 @@
 # VideoSave - Video Downloader
 
-VideoSave is a full-stack video downloader for YouTube, X/Twitter, and Instagram links. Paste or drag in a supported URL, start the download, and watch live progress updates from the backend.
+VideoSave is a full-stack video downloader for YouTube, X/Twitter, and Instagram links. Paste or drag in a supported URL, start the download, watch live progress updates, and receive the final file through the browser on the user's device.
 
-The project is split into a Next.js frontend and an Express/TypeScript backend. Downloads are handled by `yt-dlp`, realtime updates are delivered with Socket.io, and download/account records are stored with Prisma.
+The project is split into a Next.js frontend and an Express/TypeScript backend. Downloads are handled by `yt-dlp`, realtime updates are delivered with Socket.io, and download/account records are stored with Prisma. Completed media files are treated as temporary backend files: the browser downloads them through `/api/downloads/:id/file`, then the backend removes the temporary copy.
 
 ## Features
 
 - Download videos from supported social platforms using `yt-dlp`
 - Live progress, speed, ETA, completion, and failure events
+- Browser delivery endpoint so completed files are saved on the user's device
 - Guest download flow without sign-in
 - Optional Google OAuth sign-in for saved user history
 - Rate-limited backend API
@@ -95,11 +96,15 @@ GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback
 AUTH_COOKIE_NAME=videosave_session
 AUTH_SESSION_DAYS=30
 YTDLP_PATH=yt-dlp
+YTDLP_COOKIES_FILE=
+YTDLP_COOKIES_FROM_BROWSER=
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=20
 ```
 
 Google OAuth values are optional for basic guest downloads. Add them when you want account sign-in.
+
+If YouTube returns a "Sign in to confirm you're not a bot" error, provide cookies to `yt-dlp`. For local development, set `YTDLP_COOKIES_FROM_BROWSER=firefox`, `chrome`, `edge`, or another supported browser name, then restart the backend. The browser named in `.env` must be signed in to YouTube; it does not have to be the same browser used to open the app. On Windows, Chrome and Edge may lock their cookie database while running, so close them before downloading or use Firefox. For the most reliable setup, export a Netscape-format cookie file and set `YTDLP_COOKIES_FILE=/absolute/path/to/cookies.txt`.
 
 ### Frontend
 
@@ -201,6 +206,7 @@ The frontend runs at `http://localhost:3000`.
 | `GET` | `/health` | Health check |
 | `GET` | `/api/downloads` | List downloads |
 | `GET` | `/api/downloads/:id` | Get one download |
+| `GET` | `/api/downloads/:id/file` | Send completed file to the user's device |
 | `POST` | `/api/downloads` | Start a download |
 | `DELETE` | `/api/downloads/:id` | Remove a download |
 | `GET` | `/api/auth/me` | Get current auth state |

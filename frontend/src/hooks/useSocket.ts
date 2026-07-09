@@ -75,7 +75,13 @@ export function useSocket(
       handlersRef.current.onCompleted?.(data);
     const onFailed = (data: FailedEvent) =>
       handlersRef.current.onFailed?.(data);
+    const resubscribe = () => {
+      subscribedIdsRef.current.forEach((id) => {
+        s.emit("subscribe:download", id);
+      });
+    };
 
+    s.on("connect", resubscribe);
     s.on("download:progress", onProgress);
     s.on("download:title", onTitle);
     s.on("download:completed", onCompleted);
@@ -87,6 +93,7 @@ export function useSocket(
       });
       subscribedIdsRef.current = new Set();
 
+      s.off("connect", resubscribe);
       s.off("download:progress", onProgress);
       s.off("download:title", onTitle);
       s.off("download:completed", onCompleted);
