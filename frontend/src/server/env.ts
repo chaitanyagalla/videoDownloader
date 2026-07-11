@@ -15,7 +15,6 @@ export const env = {
   googleClientId: optional("GOOGLE_CLIENT_ID"),
   googleClientSecret: optional("GOOGLE_CLIENT_SECRET"),
   googleCallbackUrl: optional("GOOGLE_CALLBACK_URL"),
-  maxDownloadMb: positiveInt("MAX_DOWNLOAD_FILESIZE_MB", 500),
   maxDurationSeconds: positiveInt("MAX_VIDEO_DURATION_SECONDS", 3600),
   ytdlpProxy: optional("YTDLP_PROXY"),
   ytdlpCookies: optional("YTDLP_COOKIES"),

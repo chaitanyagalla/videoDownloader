@@ -62,7 +62,6 @@ Add the same callback URL to the Google Cloud OAuth client's authorized redirect
 Optional downloader controls:
 
 ```env
-MAX_DOWNLOAD_FILESIZE_MB=500
 MAX_VIDEO_DURATION_SECONDS=3600
 DOWNLOAD_RATE_LIMIT_MAX=5
 YTDLP_PROXY=

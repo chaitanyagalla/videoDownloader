@@ -172,9 +172,6 @@ function friendlyDownloadError(error: unknown): string {
   if (/sign in to confirm|not a bot/i.test(compact)) {
     return "YouTube requested verification. Configure YTDLP_COOKIES_BASE64 in Vercel and try again.";
   }
-  if (/max-filesize|larger than max-filesize/i.test(compact)) {
-    return `This video exceeds the ${env.maxDownloadMb} MB download limit.`;
-  }
   return compact.slice(-500) || "The media download failed";
 }
 
@@ -252,7 +249,6 @@ export async function processDownload(id: string, url: string): Promise<void> {
         mergeOutputFormat: "mp4",
         ...(ffmpegPath ? { ffmpegLocation: ffmpegPath } : {}),
         output,
-        maxFilesize: `${env.maxDownloadMb}M`,
         matchFilter: `duration <=? ${env.maxDurationSeconds} & !is_live`,
         retries: 3,
         jsRuntimes: "node",
