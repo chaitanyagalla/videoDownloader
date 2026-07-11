@@ -6,6 +6,7 @@ const nextConfig = {
     "/api/downloads": [
       "./node_modules/youtube-dl-exec/bin/**",
       "./node_modules/ffmpeg-static/**",
+      "./vendor/yt-dlp*",
     ],
   },
 };

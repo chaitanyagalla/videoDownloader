@@ -2,12 +2,15 @@
   "name": "video-downloader-frontend",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "vercel-build": "prisma migrate deploy && next build",
     "start": "next start",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/install-ytdlp.mjs",
     "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
     "db:generate": "prisma generate",
     "typecheck": "next typegen && tsc --noEmit",

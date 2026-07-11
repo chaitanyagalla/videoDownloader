@@ -15,7 +15,7 @@ The application is fully contained in `frontend/`; no separate backend process o
 
 ## Local development
 
-Requirements: Node.js 20+, npm, and PostgreSQL. Vercel Blob is only required for production deployment; local downloads are stored temporarily under `frontend/downloads/`.
+Requirements: Node.js 22+, npm, and PostgreSQL. Vercel Blob is only required for production deployment; local downloads are stored temporarily under `frontend/downloads/`.
 
 ```bash
 cd frontend

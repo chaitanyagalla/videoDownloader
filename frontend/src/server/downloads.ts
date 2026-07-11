@@ -21,6 +21,11 @@ import { env } from "./env";
 import { ApiError } from "./http";
 import { prisma } from "./prisma";
 
+const youtubeDlExecutable =
+  process.platform === "linux"
+    ? youtubeDl.create(path.join(process.cwd(), "vendor", "yt-dlp_linux"))
+    : youtubeDl;
+
 export const createDownloadSchema = z.object({
   url: z
     .string({ required_error: "URL is required" })
@@ -172,7 +177,10 @@ function friendlyDownloadError(error: unknown): string {
   if (/sign in to confirm|not a bot/i.test(compact)) {
     return "YouTube requested verification. Configure YTDLP_COOKIES_BASE64 in Vercel and try again.";
   }
-  return compact.slice(-500) || "The media download failed";
+  if (/code:\s*127|ENOENT|not found/i.test(compact)) {
+    return "The media downloader could not start. Please try again after the deployment is updated.";
+  }
+  return "The media download failed. Please verify the URL and try again.";
 }
 
 function localDownloadsDir(): string {
@@ -237,7 +245,7 @@ export async function processDownload(id: string, url: string): Promise<void> {
     });
 
     const output = path.join(workDir, "%(title).120B-%(id)s.%(ext)s");
-    const child = youtubeDl.exec(
+    const child = youtubeDlExecutable.exec(
       url,
       {
         noPlaylist: true,
