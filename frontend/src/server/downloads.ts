@@ -172,10 +172,17 @@ async function cookieFile(workDir: string): Promise<string | undefined> {
 }
 
 function friendlyDownloadError(error: unknown): string {
-  const raw = error instanceof Error ? error.message : String(error);
+  const stderr =
+    typeof error === "object" && error !== null && "ytdlpStderr" in error
+      ? String(error.ytdlpStderr)
+      : "";
+  const raw = `${error instanceof Error ? error.message : String(error)} ${stderr}`;
   const compact = raw.replace(/\s+/g, " ").trim();
   if (/sign in to confirm|not a bot/i.test(compact)) {
     return "YouTube requested verification. Configure YTDLP_COOKIES_BASE64 in Vercel and try again.";
+  }
+  if (/video unavailable|private video|members[- ]only/i.test(compact)) {
+    return "This video is unavailable or restricted by its source.";
   }
   if (/code:\s*127|ENOENT|not found/i.test(compact)) {
     return "The media downloader could not start. Please try again after the deployment is updated.";
@@ -267,8 +274,10 @@ export async function processDownload(id: string, url: string): Promise<void> {
     );
 
     let lastWrite = 0;
+    let stderrTail = "";
     child.stderr?.on("data", (chunk: Buffer | string) => {
       const text = chunk.toString();
+      stderrTail = `${stderrTail}${text}`.slice(-8_000);
       const match = text.match(/\[download\]\s+([\d.]+)%.*?(?:at\s+([^\s]+))?.*?(?:ETA\s+([^\s]+))?/i);
       if (!match) return;
       const now = Date.now();
@@ -286,7 +295,14 @@ export async function processDownload(id: string, url: string): Promise<void> {
       }).catch(() => undefined);
     });
 
-    await child;
+    try {
+      await child;
+    } catch (error) {
+      if (error instanceof Error) {
+        Object.assign(error, { ytdlpStderr: stderrTail });
+      }
+      throw error;
+    }
     const entries = await readdir(workDir, { withFileTypes: true });
     const media = entries.find(
       (entry) =>
