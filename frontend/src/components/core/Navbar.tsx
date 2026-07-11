@@ -1,10 +1,8 @@
 "use client";
 
 import type { AuthUser } from "@/types";
-import type { OpsStatus } from "@/components/heist/StatusIndicator";
 
 type NavbarProps = {
-  statusLabel: OpsStatus;
   user: AuthUser | null;
   isAuthLoading: boolean;
   isSigningOut: boolean;
@@ -12,35 +10,17 @@ type NavbarProps = {
   onSignOut: () => Promise<void>;
 };
 
-function getCompactStatusLabel(status: OpsStatus): string {
-  switch (status) {
-    case "CAPTURE":
-      return "Capture";
-    case "PROCESSING":
-      return "Processing";
-    case "READY":
-      return "Ready";
-    case "REVIEW":
-      return "Review";
-    default:
-      return "Idle";
-  }
-}
-
 function getUserInitial(user: AuthUser): string {
   return (user.name?.trim() || user.email).slice(0, 1).toUpperCase();
 }
 
 export default function Navbar({
-  statusLabel,
   user,
   isAuthLoading,
   isSigningOut,
   onSignIn,
   onSignOut,
 }: NavbarProps) {
-  const compactStatusLabel = getCompactStatusLabel(statusLabel);
-
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border-soft)] bg-[rgba(5,7,6,0.78)] backdrop-blur-xl">
       <div className="mx-auto flex min-h-14 w-full max-w-[1440px] flex-wrap items-center justify-between gap-3 px-3 py-2 sm:flex-nowrap sm:px-6 lg:px-8">
@@ -62,21 +42,7 @@ export default function Navbar({
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <div className="flex items-center gap-2 sm:hidden">
-            <span className="h-2 w-2 rounded-full bg-[var(--mint)]" />
-            <span className="font-mono-system text-[10px] text-[var(--text-soft)]">
-              {compactStatusLabel}
-            </span>
-          </div>
-
-          <div className="hidden items-center gap-2 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-[var(--mint)]" />
-            <span className="rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 font-mono-system text-xs text-[var(--text-soft)]">
-              {compactStatusLabel}
-            </span>
-          </div>
-
-          <div className="ml-1 flex min-w-0 items-center gap-2 border-l border-[var(--border-soft)] pl-2 sm:ml-3 sm:pl-3">
+          <div className="ml-1 flex min-w-0 items-center gap-2 sm:ml-3">
             {user ? (
               <>
                 <div className="flex min-w-0 items-center gap-2">

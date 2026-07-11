@@ -19,6 +19,10 @@ function queryAll<T extends Element>(
   return Array.from(root.querySelectorAll<T>(selector));
 }
 
+function hasTargets(targets: HTMLElement[]): boolean {
+  return targets.length > 0;
+}
+
 export function useDashboardMotion({
   rootRef,
   status,
@@ -52,15 +56,21 @@ export function useDashboardMotion({
         ...archivePanel,
       ];
 
+      if (!hasTargets(introTargets)) {
+        return;
+      }
+
       gsap.set(introTargets, {
         opacity: 0,
         y: 22,
       });
 
-      gsap.set(terminalPanel, {
-        x: 24,
-        y: 0,
-      });
+      if (hasTargets(terminalPanel)) {
+        gsap.set(terminalPanel, {
+          x: 24,
+          y: 0,
+        });
+      }
 
       const timeline = gsap.timeline({
         defaults: {
@@ -68,15 +78,18 @@ export function useDashboardMotion({
         },
       });
 
-      timeline
-        .to(heroElements, {
+      if (hasTargets(heroElements)) {
+        timeline.to(heroElements, {
           opacity: 1,
           y: 0,
           duration: 0.72,
           stagger: 0.08,
           clearProps: "opacity,transform",
-        })
-        .to(
+        });
+      }
+
+      if (hasTargets(leftPanels)) {
+        timeline.to(
           leftPanels,
           {
             opacity: 1,
@@ -85,9 +98,12 @@ export function useDashboardMotion({
             stagger: 0.1,
             clearProps: "opacity,transform",
           },
-          "-=0.34"
-        )
-        .to(
+          timeline.duration() > 0 ? "-=0.34" : undefined
+        );
+      }
+
+      if (hasTargets(terminalPanel)) {
+        timeline.to(
           terminalPanel,
           {
             opacity: 1,
@@ -95,9 +111,12 @@ export function useDashboardMotion({
             duration: 0.72,
             clearProps: "opacity,transform",
           },
-          "-=0.46"
-        )
-        .to(
+          timeline.duration() > 0 ? "-=0.46" : undefined
+        );
+      }
+
+      if (hasTargets(archivePanel)) {
+        timeline.to(
           archivePanel,
           {
             opacity: 1,
@@ -105,8 +124,9 @@ export function useDashboardMotion({
             duration: 0.66,
             clearProps: "opacity,transform",
           },
-          "-=0.4"
+          timeline.duration() > 0 ? "-=0.4" : undefined
         );
+      }
     }, root);
 
     return () => {

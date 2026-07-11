@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String        @id @default(cuid())
+  email             String        @unique
+  name              String?
+  avatarUrl         String?
+  provider          String        @default("google")
+  providerAccountId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  sessions          AuthSession[]
+  downloads         Download[]
+
+  @@unique([provider, providerAccountId])
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Download {
+  id                String   @id @default(cuid())
+  url               String
+  platform          String
+  title             String?
+  status            String   @default("pending")
+  progress          Float    @default(0)
+  speed             String?
+  eta               String?
+  filePath          String?
+  fileSize          String?
+  errorMsg          String?
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anonymousClientId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([anonymousClientId, createdAt])
+}

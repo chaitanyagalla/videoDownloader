@@ -20,6 +20,8 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+secrets/
+*cookies*.txt
 
 # Logs
 logs/
@@ -36,7 +38,8 @@ pnpm-debug.log*
 *.sqlite3
 
 # Runtime downloads / temporary files
-downloads/
+/downloads/
+/frontend/downloads/
 tmp/
 temp/
 *.tmp
