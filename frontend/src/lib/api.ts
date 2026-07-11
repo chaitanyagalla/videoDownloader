@@ -10,13 +10,13 @@ import {
 // ─── Axios Instance ────────────────────────────────────────────────────────
 
 const apiClient: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000",
+  baseURL: undefined,
   timeout: 15_000,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
 });
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const apiBaseUrl = "";
 
 // ─── Error Normalisation ───────────────────────────────────────────────────
 
@@ -52,7 +52,7 @@ function normalizeError(error: unknown): never {
 
   if (error instanceof AxiosError && error.request) {
     throw new ApiClientError(
-      "Cannot reach the server. Make sure the backend is running.",
+      "Cannot reach the application server. Please try again.",
       "NETWORK_ERROR",
       0
     );
@@ -129,27 +129,11 @@ export async function deleteDownload(id: string): Promise<void> {
 }
 
 export async function downloadFile(id: string): Promise<void> {
-  try {
-    const res = await apiClient.get<Blob>(`/api/downloads/${id}/file`, {
-      responseType: "blob",
-      timeout: 0,
-    });
-
-    if (typeof window === "undefined" || typeof document === "undefined") {
-      return;
-    }
-
-    const objectUrl = window.URL.createObjectURL(res.data);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = `videosave-${id}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => {
-      window.URL.revokeObjectURL(objectUrl);
-    }, 1000);
-  } catch (err) {
-    normalizeError(err);
-  }
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const link = document.createElement("a");
+  link.href = `${apiBaseUrl}/api/downloads/${encodeURIComponent(id)}/file`;
+  link.download = `videosave-${id}.mp4`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }

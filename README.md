@@ -1,241 +1,109 @@
-# VideoSave - Video Downloader
+# VideoSave
 
-VideoSave is a full-stack video downloader for YouTube, X/Twitter, and Instagram links. Paste or drag in a supported URL, start the download, watch live progress updates, and receive the final file through the browser on the user's device.
+VideoSave is a Next.js video downloader for YouTube, X/Twitter, and Instagram. The UI and server APIs now live in one deployable Next.js application under `frontend/`.
 
-The project is split into a Next.js frontend and an Express/TypeScript backend. Downloads are handled by `yt-dlp`, realtime updates are delivered with Socket.io, and download/account records are stored with Prisma. Completed media files are treated as temporary backend files: the browser downloads them through `/api/downloads/:id/file`, then the backend removes the temporary copy.
+## Architecture
 
-## Features
+- Next.js App Router UI and route handlers
+- PostgreSQL with Prisma for users, sessions, download history, and guest job state
+- `yt-dlp` bundled through `youtube-dl-exec`
+- Vercel Blob for completed media delivery
+- Polling for progress so jobs remain visible across Vercel Function instances
+- Optional Google OAuth sign-in
 
-- Download videos from supported social platforms using `yt-dlp`
-- Live progress, speed, ETA, completion, and failure events
-- Browser delivery endpoint so completed files are saved on the user's device
-- Guest download flow without sign-in
-- Optional Google OAuth sign-in for saved user history
-- Rate-limited backend API
-- Prisma data model for users, sessions, and downloads
-- Responsive Next.js UI with Tailwind CSS
+The application is fully contained in `frontend/`; no separate backend process or backend directory is required.
 
-## Tech Stack
+## Local development
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | Next.js 14, React, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express, TypeScript |
-| Database | PostgreSQL with Prisma ORM |
-| Realtime | Socket.io |
-| Downloader | yt-dlp |
-| Validation | Zod |
-
-## Prerequisites
-
-- Node.js 18 or later
-- npm
-- PostgreSQL database, such as Neon
-- `yt-dlp` installed locally
-
-Install `yt-dlp`:
-
-| OS | Command |
-| --- | --- |
-| Windows | `winget install yt-dlp` |
-| macOS | `brew install yt-dlp` |
-| Linux | `sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && sudo chmod a+rx /usr/local/bin/yt-dlp` |
-
-## Project Structure
-
-```text
-video-downloader/
-|-- backend/
-|   |-- prisma/
-|   |   |-- migrations/
-|   |   `-- schema.prisma
-|   |-- src/
-|   |   |-- config/
-|   |   |-- controllers/
-|   |   |-- middleware/
-|   |   |-- models/
-|   |   |-- routes/
-|   |   |-- services/
-|   |   |-- types/
-|   |   |-- utils/
-|   |   |-- app.ts
-|   |   `-- server.ts
-|   |-- .env.example
-|   |-- package.json
-|   `-- tsconfig.json
-|-- frontend/
-|   |-- src/
-|   |   |-- app/
-|   |   |-- components/
-|   |   |-- hooks/
-|   |   |-- lib/
-|   |   |-- services/
-|   |   |-- types/
-|   |   `-- utils/
-|   |-- .env.local.example
-|   |-- package.json
-|   `-- tsconfig.json
-|-- .gitignore
-`-- README.md
-```
-
-## Environment Variables
-
-### Backend
-
-Create `backend/.env` from `backend/.env.example`.
-
-```env
-PORT=4000
-NODE_ENV=development
-DATABASE_URL="postgresql://USER:PASSWORD@HOST.neon.tech/videosave?sslmode=require"
-FRONTEND_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=http://localhost:4000/api/auth/google/callback
-AUTH_COOKIE_NAME=videosave_session
-AUTH_SESSION_DAYS=30
-YTDLP_PATH=yt-dlp
-YTDLP_COOKIES_FILE=
-YTDLP_COOKIES_FROM_BROWSER=
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=20
-```
-
-Google OAuth values are optional for basic guest downloads. Add them when you want account sign-in.
-
-If YouTube returns a "Sign in to confirm you're not a bot" error, provide cookies to `yt-dlp`. For local development, set `YTDLP_COOKIES_FROM_BROWSER=firefox`, `chrome`, `edge`, or another supported browser name, then restart the backend. The browser named in `.env` must be signed in to YouTube; it does not have to be the same browser used to open the app. On Windows, Chrome and Edge may lock their cookie database while running, so close them before downloading or use Firefox. For the most reliable setup, export a Netscape-format cookie file and set `YTDLP_COOKIES_FILE=/absolute/path/to/cookies.txt`.
-
-### Frontend
-
-Create `frontend/.env` or `frontend/.env.local` from `frontend/.env.local.example`.
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=http://localhost:4000
-```
-
-## Local Setup
-
-### 1. Install backend dependencies
-
-```bash
-cd backend
-npm install
-```
-
-### 2. Configure the backend
-
-```bash
-cp .env.example .env
-npx prisma generate
-npx prisma migrate dev
-```
-
-On Windows PowerShell, use this copy command instead:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-### 3. Start the backend
-
-```bash
-npm run dev
-```
-
-The backend runs at `http://localhost:4000`.
-
-### 4. Install frontend dependencies
-
-Open a second terminal:
+Requirements: Node.js 20+, npm, and PostgreSQL. Vercel Blob is only required for production deployment; local downloads are stored temporarily under `frontend/downloads/`.
 
 ```bash
 cd frontend
 npm install
-```
-
-### 5. Configure the frontend
-
-```bash
 cp .env.local.example .env.local
-```
-
-On Windows PowerShell:
-
-```powershell
-Copy-Item .env.local.example .env.local
-```
-
-### 6. Start the frontend
-
-```bash
+npm run db:deploy
 npm run dev
 ```
 
-The frontend runs at `http://localhost:3000`.
+On PowerShell, use `Copy-Item .env.local.example .env.local` instead of `cp`.
 
-## Available Scripts
+Open `http://localhost:3000`. A separate Express process and a system-installed `yt-dlp` are no longer required.
 
-### Backend
+## Deploy to Vercel
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Express server in development mode |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run the compiled backend |
-| `npm run typecheck` | Run TypeScript checks without emitting files |
-| `npm run prisma:generate` | Generate the Prisma client |
-| `npm run prisma:migrate` | Run Prisma development migrations |
-| `npm run prisma:studio` | Open Prisma Studio |
+1. Import this repository in Vercel.
+2. Set the project Root Directory to `frontend`.
+3. Create a **public** Vercel Blob store and connect it to the project. Vercel adds `BLOB_READ_WRITE_TOKEN` automatically.
+4. Add a PostgreSQL database (Neon, Supabase, or Vercel Marketplace Postgres) and set `DATABASE_URL`.
+5. Add `APP_URL` and `NEXT_PUBLIC_APP_URL` with the production origin, for example `https://your-app.vercel.app`.
+6. Deploy. The `vercel-build` script applies Prisma migrations before building Next.js.
 
-### Frontend
+Required production variables:
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the Next.js development server |
-| `npm run build` | Build the production frontend |
-| `npm start` | Start the production Next.js server |
-| `npm run typecheck` | Run TypeScript checks |
-| `npm run lint` | Run Next.js linting |
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/health` | Health check |
-| `GET` | `/api/downloads` | List downloads |
-| `GET` | `/api/downloads/:id` | Get one download |
-| `GET` | `/api/downloads/:id/file` | Send completed file to the user's device |
-| `POST` | `/api/downloads` | Start a download |
-| `DELETE` | `/api/downloads/:id` | Remove a download |
-| `GET` | `/api/auth/me` | Get current auth state |
-| `GET` | `/api/auth/google` | Start Google OAuth |
-| `GET` | `/api/auth/google/callback` | Handle Google OAuth callback |
-| `POST` | `/api/auth/logout` | Sign out |
-
-Example download request:
-
-```json
-{
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-}
+```env
+DATABASE_URL=postgresql://...
+BLOB_READ_WRITE_TOKEN=vercel_blob_...
+APP_URL=https://your-app.vercel.app
+NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 ```
 
-## Socket.io Events
+Optional Google OAuth variables:
 
-Server to client:
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_CALLBACK_URL=https://your-app.vercel.app/api/auth/google/callback
+AUTH_COOKIE_NAME=videosave_session
+AUTH_SESSION_DAYS=30
+```
 
-| Event | Payload |
+Add the same callback URL to the Google Cloud OAuth client's authorized redirect URIs.
+
+Optional downloader controls:
+
+```env
+MAX_DOWNLOAD_FILESIZE_MB=500
+MAX_VIDEO_DURATION_SECONDS=3600
+DOWNLOAD_RATE_LIMIT_MAX=5
+YTDLP_PROXY=
+YTDLP_COOKIES_BASE64=
+```
+
+`YTDLP_COOKIES_BASE64` is a base64-encoded Netscape cookie file. It can help when YouTube challenges a datacenter IP. Treat it as a secret and never expose it through a `NEXT_PUBLIC_` variable.
+
+## Commands
+
+Run these inside `frontend/`:
+
+| Command | Purpose |
 | --- | --- |
-| `download:progress` | `{ id, progress, speed, eta }` |
-| `download:title` | `{ id, title }` |
-| `download:completed` | `{ id, filePath, fileSize }` |
-| `download:failed` | `{ id, error }` |
+| `npm run dev` | Start the complete app locally |
+| `npm run build` | Create a production build |
+| `npm run vercel-build` | Apply migrations and build on Vercel |
+| `npm run typecheck` | Generate Next route types and check TypeScript |
+| `npm run lint` | Run ESLint |
+| `npm run db:deploy` | Apply committed Prisma migrations |
+| `npm run db:generate` | Regenerate Prisma Client |
 
-Client to server:
+## API compatibility
 
-| Event | Payload |
-| --- | --- |
-| `subscribe:download` | `downloadId` |
-| `unsubscribe:download` | `downloadId` |
+The frontend continues to use the original endpoints:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Health check |
+| `GET` | `/api/downloads` | Signed-in download history |
+| `POST` | `/api/downloads` | Start a guest or signed-in download |
+| `GET` | `/api/downloads/:id` | Poll job status and progress |
+| `GET` | `/api/downloads/:id/file` | Redirect to the completed media file |
+| `DELETE` | `/api/downloads/:id` | Delete the record and stored blob |
+| `GET` | `/api/auth/me` | Current account state |
+| `GET` | `/api/auth/google` | Begin Google OAuth |
+| `GET` | `/api/auth/google/callback` | Finish Google OAuth |
+| `POST` | `/api/auth/logout` | Sign out |
+
+## Vercel runtime limits
+
+The download route is configured for a 300-second Function duration so it works on Vercel Hobby with Fluid Compute. A download that cannot finish and upload within that duration will time out. Completed files are stored in public Vercel Blob URLs with unguessable paths; deleting a download removes its Blob object as well.
+
+Only download media you own or are authorized to save, and follow the source platform's terms and applicable copyright law.
